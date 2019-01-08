@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+    <flow name="getCourseDynamicQuery">
+      <set-variable variableName="flowName" value="getCourseDynamicQuery" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+       <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+       <scripting:transformer doc:name="build get advisors relations dynamic query">
+           <scripting:script engine="Groovy" file="groovyScripts/getRelationsDynamicQuery.groovy"/>
+       </scripting:transformer>
+       <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Database">
+           <db:dynamic-query><![CDATA[#[payload]]]></db:dynamic-query>
+       </db:select>
+       <dw:transform-message doc:name="Transform payload to Java">
+           <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+       </dw:transform-message>
+       <logger message="projectName=#[flowVars.projectName],flowName=&quot;getCourseDynamicQuery&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+           level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+   </flow>
+    <flow name="getCourseSectionsFlow">
+      <set-variable variableName="flowName" value="getCourseSectionsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer doc:name="Set Query Parameters" scope="invocation">
+            <add-message-property key="subject" value="#[message.inboundProperties.'http.query.params'.subject]"/>
+            <add-message-property key="courseNumber" value="#[message.inboundProperties.'http.query.params'.courseNumber]"/>
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.term]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="college" value="#[message.inboundProperties.'http.query.params'.college]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="status" value="#[message.inboundProperties.'http.query.params'.status]"/>
+            <add-message-property key="crsLevel" value="#[message.inboundProperties.'http.query.params'.courseLevel]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Course Sections from Banner">
+            <db:parameterized-query><![CDATA[Select * from (with sections as (
+(select * from (select row_number() over( order by s.ssbsect_crn) rowNums,count(*) over() as total,
+       s.SSBSECT_TERM_CODE,
+       s.SSBSECT_CRN,
+       s.ssbsect_subj_code,
+       s.SSBSECT_CRSE_NUMB,
+       cl1.SCRLEVL_LEVL_CODE,
+       nvl(s.SSBSECT_CRSE_TITLE, c1.scbcrse_title) title,
+       s.SSBSECT_SSTS_CODE,
+       s.SSBSECT_SEQ_NUMB,
+       s.SSBSECT_CREDIT_HRS,
+       c1.SCBCRSE_CREDIT_HR_LOW,
+       c1.SCBCRSE_CREDIT_HR_HIGH,
+       c1.SCBCRSE_CREDIT_HR_IND,
+       c1.SCBCRSE_COLL_CODE,
+       c1.SCBCRSE_DEPT_CODE,
+       s.SSBSECT_SCHD_CODE,
+       s.SSBSECT_PTRM_CODE,
+       s.SSBSECT_PTRM_START_DATE,
+       s.SSBSECT_PTRM_END_DATE,
+       s.SSBSECT_CAMP_CODE,
+       s.SSBSECT_INSM_CODE,
+       s.SSBSECT_GMOD_CODE
+  from ssbsect s
+  inner join scbcrse c1
+  on c1.SCBCRSE_SUBJ_CODE = s.SSBSECT_SUBJ_CODE
+  and c1.SCBCRSE_CRSE_NUMB = s.SSBSECT_CRSE_NUMB
+  and c1.SCBCRSE_EFF_TERM = (select max(c2.SCBCRSE_EFF_TERM)
+                              from scbcrse c2
+                            where c2.SCBCRSE_SUBJ_CODE = c1.SCBCRSE_SUBJ_CODE
+                              and c2.SCBCRSE_CRSE_NUMB = c1.SCBCRSE_CRSE_NUMB
+                              and c2.SCBCRSE_EFF_TERM <= s.SSBSECT_TERM_CODE)
+  inner join scrlevl cl1
+  on cl1.SCRLEVL_SUBJ_CODE = s.SSBSECT_SUBJ_CODE
+  and cl1.SCRLEVL_CRSE_NUMB = s.SSBSECT_CRSE_NUMB
+  and cl1.SCRLEVL_EFF_TERM = (select max(cl2.SCRLEVL_EFF_TERM)
+                                from scrlevl cl2
+                              where cl2.SCRLEVL_SUBJ_CODE = cl1.SCRLEVL_SUBJ_CODE
+                                and cl2.SCRLEVL_CRSE_NUMB = cl1.SCRLEVL_CRSE_NUMB
+                                and cl2.SCRLEVL_EFF_TERM <= c1.SCBCRSE_EFF_TERM)
+  where s.ssbsect_term_code = #[flowVars.term]
+    and ((nvl(#[flowVars.college],'N') != 'N' and c1.scbcrse_coll_code = #[flowVars.college]) or nvl(#[flowVars.college],'N') = 'N')
+    and ((nvl(#[flowVars.crsLevel],'N') != 'N' and cl1.SCRLEVL_LEVL_CODE = #[flowVars.crsLevel]) or nvl(#[flowVars.crsLevel],'N') = 'N')
+    and ((nvl(#[flowVars.subject],'N') != 'N' and s.SSBSECT_SUBJ_CODE = #[flowVars.subject]) or nvl(#[flowVars.subject],'N') = 'N' )
+    and ((nvl(#[flowVars.courseNumber],'N') != 'N' and s.SSBSECT_CRSE_NUMB = #[flowVars.courseNumber]) or nvl(#[flowVars.courseNumber],'N') = 'N' )
+    and ((nvl(#[flowVars.status],'N') != 'N' and s.SSBSECT_SSTS_CODE = #[flowVars.status]) or nvl(#[flowVars.status],'N') = 'N')
+    ) t
+  where t.rowNums > replace(#[flowVars.initRow],1,0)
+    and t.rowNums < (#[flowVars.initRow] + #[flowVars.maxRows])))
+select sections.total,
+       sections.SSBSECT_TERM_CODE,
+       sections.SSBSECT_CRN,
+       sections.ssbsect_subj_code,
+       stvsubj.STVSUBJ_DESC,
+       sections.SSBSECT_CRSE_NUMB,
+       sections.scrlevl_levl_code,
+       sections.title,
+       sections.SSBSECT_SSTS_CODE,
+       stvssts.STVSSTS_DESC,
+       sections.SSBSECT_SEQ_NUMB,
+       sections.SSBSECT_CREDIT_HRS,
+       sections.SCBCRSE_CREDIT_HR_LOW,
+       sections.SCBCRSE_CREDIT_HR_HIGH,
+       sections.SCBCRSE_CREDIT_HR_IND,
+       sections.SCBCRSE_COLL_CODE,
+       stvcoll.STVCOLL_DESC,
+       sections.SCBCRSE_DEPT_CODE,
+       stvdept.STVDEPT_DESC,
+       sections.SSBSECT_SCHD_CODE,
+       stvschd.STVSCHD_DESC,
+       sections.SSBSECT_PTRM_CODE,
+       stvptrm.STVPTRM_DESC,
+       sections.SSBSECT_PTRM_START_DATE,
+       sections.SSBSECT_PTRM_END_DATE,
+       sections.SSBSECT_CAMP_CODE,
+       stvcamp.STVCAMP_DESC,
+       sections.SSBSECT_INSM_CODE,
+       GENERAL.GTVINSM.GTVINSM_DESC,
+       sections.SSBSECT_GMOD_CODE,
+       stvgmod.STVGMOD_DESC
+  from sections
+  inner join stvsubj
+  on stvsubj_code = sections.ssbsect_subj_code
+  inner join stvssts
+  on stvssts_code = sections.SSBSECT_SSTS_CODE
+  inner join stvcoll
+  on stvcoll_code = sections.SCBCRSE_COLL_CODE
+  inner join stvdept
+  on stvdept_code = sections.SCBCRSE_DEPT_CODE
+  inner join stvschd
+  on stvschd_code = sections.SSBSECT_SCHD_CODE
+  inner join stvptrm
+  on stvptrm.STVPTRM_CODE = sections.SSBSECT_PTRM_CODE
+  inner join stvcamp
+  on stvcamp.STVCAMP_CODE = sections.SSBSECT_CAMP_CODE
+  left outer join GENERAL.GTVINSM
+  on GENERAL.GTVINSM.GTVINSM_CODE = sections.SSBSECT_INSM_CODE
+  left outer join stvgmod
+  on stvgmod_code = sections.ssbsect_gmod_code)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": payload map ((crs , indexOfCrs) -> {
+
+		"totalRecords" :crs.TOTAL,
+		"term" :crs.SSBSECT_TERM_CODE,
+		"crn" :crs.SSBSECT_CRN,
+		"title" :crs.TITLE,
+		"subjectCode" :crs.SSBSECT_SUBJ_CODE,
+		"subjectDescription" :crs.STVSUBJ_DESC,
+		"courseNumber" :crs.SSBSECT_CRSE_NUMB,
+		"courseLevel" :crs.scrlevl_levl_code,
+		"sectionNumber" :crs.SSBSECT_SEQ_NUMB,
+		"campus" :crs.SSBSECT_CAMP_CODE,
+		"campusDescription" :crs.STVCAMP_DESC,
+		"collegeCode" :crs.SCBCRSE_COLL_CODE,
+		"collegeDescription" :crs.STVCOLL_DESC,
+		"departmentCode" :crs.SCBCRSE_DEPT_CODE,
+		"departmentDescription" :crs.STVDEPT_DESC,
+		"partOfTermCode" :crs.SSBSECT_PTRM_CODE,
+		"partOfTermDescription" :crs.STVPTRM_DESC,
+		"partOfTermStartDate" :crs.SSBSECT_PTRM_START_DATE,
+		"partOfTermEndDate" :crs.SSBSECT_PTRM_END_DATE,
+		"creditHrs" :crs.SSBSECT_CREDIT_HRS,
+		"creditHrLow" :crs.SCBCRSE_CREDIT_HR_LOW,
+		"creditHrLowHighRelation" :crs.SCBCRSE_CREDIT_HR_IND,
+		"creditHrHigh" :crs.SCBCRSE_CREDIT_HR_HIGH,
+		"instructionalTypeCode" :crs.SSBSECT_SCHD_CODE,
+		"instructionalTypeDescription" :crs.STVSCHD_DESC,
+    	"instructionalMethod" :crs.SSBSECT_INSM_CODE,
+    	"instructionalMethodDesc" :crs.GTVINSM_DESC,
+    	"gradeMode" :crs.SSBSECT_GMOD_CODE,
+    	"gradeModeDescription" :crs.STVGMOD_DESC,
+    	"status" :crs.SSBSECT_SSTS_CODE,
+    	"statusDescription" :crs.STVSSTS_DESC
+	}),
+	"errors":[]
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getCourseSectionsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getCourseSectionFlow">
+      <set-variable variableName="flowName" value="getCourseSectionFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="courseRefNumber" value="#[message.inboundProperties.'http.uri.params'.courseRefNumber]"/>
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.term]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Course Section from Banner">
+            <db:parameterized-query><![CDATA[Select * from (with sections as (select
+       s.SSBSECT_TERM_CODE,
+       s.SSBSECT_CRN,
+       s.ssbsect_subj_code,
+       s.SSBSECT_CRSE_NUMB,
+       cl1.SCRLEVL_LEVL_CODE,
+       nvl(s.SSBSECT_CRSE_TITLE, c1.scbcrse_title) title,
+       s.SSBSECT_SSTS_CODE,
+       s.SSBSECT_SEQ_NUMB,
+       s.SSBSECT_CREDIT_HRS,
+       c1.SCBCRSE_CREDIT_HR_LOW,
+       c1.SCBCRSE_CREDIT_HR_HIGH,
+       c1.SCBCRSE_CREDIT_HR_IND,
+       c1.SCBCRSE_COLL_CODE,
+       c1.SCBCRSE_DEPT_CODE,
+       s.SSBSECT_SCHD_CODE,
+       s.SSBSECT_PTRM_CODE,
+       s.SSBSECT_PTRM_START_DATE,
+       s.SSBSECT_PTRM_END_DATE,
+       s.SSBSECT_CAMP_CODE,
+       s.SSBSECT_INSM_CODE,
+       s.SSBSECT_GMOD_CODE
+  from ssbsect s
+  inner join scbcrse c1
+  on c1.SCBCRSE_SUBJ_CODE = s.SSBSECT_SUBJ_CODE
+  and c1.SCBCRSE_CRSE_NUMB = s.SSBSECT_CRSE_NUMB
+  and c1.SCBCRSE_EFF_TERM = (select max(c2.SCBCRSE_EFF_TERM)
+                              from scbcrse c2
+                            where c2.SCBCRSE_SUBJ_CODE = c1.SCBCRSE_SUBJ_CODE
+                              and c2.SCBCRSE_CRSE_NUMB = c1.SCBCRSE_CRSE_NUMB
+                              and c2.SCBCRSE_EFF_TERM <= s.SSBSECT_TERM_CODE)
+  inner join scrlevl cl1
+  on cl1.SCRLEVL_SUBJ_CODE = s.SSBSECT_SUBJ_CODE
+  and cl1.SCRLEVL_CRSE_NUMB = s.SSBSECT_CRSE_NUMB
+  and cl1.SCRLEVL_EFF_TERM = (select max(cl2.SCRLEVL_EFF_TERM)
+                                from scrlevl cl2
+                              where cl2.SCRLEVL_SUBJ_CODE = cl1.SCRLEVL_SUBJ_CODE
+                                and cl2.SCRLEVL_CRSE_NUMB = cl1.SCRLEVL_CRSE_NUMB
+                                and cl2.SCRLEVL_EFF_TERM <= c1.SCBCRSE_EFF_TERM)
+  where s.ssbsect_term_code = #[flowVars.term]
+    and s.ssbsect_crn = #[flowVars.courseRefNumber]
+   )
+select sections.SSBSECT_TERM_CODE,
+       sections.SSBSECT_CRN,
+       sections.ssbsect_subj_code,
+       stvsubj.STVSUBJ_DESC,
+       sections.SSBSECT_CRSE_NUMB,
+       sections.scrlevl_levl_code,
+       sections.title,
+       sections.SSBSECT_SSTS_CODE,
+       stvssts.STVSSTS_DESC,
+       sections.SSBSECT_SEQ_NUMB,
+       sections.SSBSECT_CREDIT_HRS,
+       sections.SCBCRSE_CREDIT_HR_LOW,
+       sections.SCBCRSE_CREDIT_HR_HIGH,
+       sections.SCBCRSE_CREDIT_HR_IND,
+       sections.SCBCRSE_COLL_CODE,
+       stvcoll.STVCOLL_DESC,
+       sections.SCBCRSE_DEPT_CODE,
+       stvdept.STVDEPT_DESC,
+       sections.SSBSECT_SCHD_CODE,
+       stvschd.STVSCHD_DESC,
+       sections.SSBSECT_PTRM_CODE,
+       stvptrm.STVPTRM_DESC,
+       sections.SSBSECT_PTRM_START_DATE,
+       sections.SSBSECT_PTRM_END_DATE,
+       sections.SSBSECT_CAMP_CODE,
+       stvcamp.STVCAMP_DESC,
+       sections.SSBSECT_INSM_CODE,
+       GENERAL.GTVINSM.GTVINSM_DESC,
+       sections.SSBSECT_GMOD_CODE,
+       stvgmod.STVGMOD_DESC
+  from sections
+  inner join stvsubj
+  on stvsubj_code = sections.ssbsect_subj_code
+  inner join stvssts
+  on stvssts_code = sections.SSBSECT_SSTS_CODE
+  inner join stvcoll
+  on stvcoll_code = sections.SCBCRSE_COLL_CODE
+  inner join stvdept
+  on stvdept_code = sections.SCBCRSE_DEPT_CODE
+  inner join stvschd
+  on stvschd_code = sections.SSBSECT_SCHD_CODE
+  inner join stvptrm
+  on stvptrm.STVPTRM_CODE = sections.SSBSECT_PTRM_CODE
+  inner join stvcamp
+  on stvcamp.STVCAMP_CODE = sections.SSBSECT_CAMP_CODE
+  left outer join GENERAL.GTVINSM
+  on GENERAL.GTVINSM.GTVINSM_CODE = sections.SSBSECT_INSM_CODE
+  left outer join stvgmod
+  on stvgmod_code = sections.ssbsect_gmod_code)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+             <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": payload map ((crs , indexOfCrs) -> {
+
+		"term" :crs.SSBSECT_TERM_CODE,
+		"crn" :crs.SSBSECT_CRN,
+		"title" :crs.TITLE,
+		"subjectCode" :crs.SSBSECT_SUBJ_CODE,
+		"subjectDescription" :crs.STVSUBJ_DESC,
+		"courseNumber" :crs.SSBSECT_CRSE_NUMB,
+		"courseLevel" : crs.scrlevl_levl_code,
+		"sectionNumber" :crs.SSBSECT_SEQ_NUMB,
+		"campus" :crs.SSBSECT_CAMP_CODE,
+		"campusDescription" :crs.STVCAMP_DESC,
+		"collegeCode" :crs.SCBCRSE_COLL_CODE,
+		"collegeDescription" :crs.STVCOLL_DESC,
+		"departmentCode" :crs.SCBCRSE_DEPT_CODE,
+		"departmentDescription" :crs.STVDEPT_DESC,
+		"partOfTermCode" :crs.SSBSECT_PTRM_CODE,
+		"partOfTermDescription" :crs.STVPTRM_DESC,
+		"partOfTermStartDate" :crs.SSBSECT_PTRM_START_DATE,
+		"partOfTermEndDate" :crs.SSBSECT_PTRM_END_DATE,
+		"creditHrs" :crs.SSBSECT_CREDIT_HRS,
+		"creditHrLow" :crs.SCBCRSE_CREDIT_HR_LOW,
+		"creditHrLowHighRelation" :crs.SCBCRSE_CREDIT_HR_IND,
+		"creditHrHigh" :crs.SCBCRSE_CREDIT_HR_HIGH,
+		"instructionalTypeCode" :crs.SSBSECT_SCHD_CODE,
+		"instructionalTypeDescription" :crs.STVSCHD_DESC,
+    	"instructionalMethod" :crs.SSBSECT_INSM_CODE,
+    	"instructionalMethodDesc" :crs.GTVINSM_DESC,
+    	"gradeMode" :crs.SSBSECT_GMOD_CODE,
+    	"gradeModeDescription" :crs.STVGMOD_DESC,
+    	"status" :crs.SSBSECT_SSTS_CODE,
+    	"statusDescription" :crs.STVSSTS_DESC
+	}),
+	"errors":[]
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getCourseSectionFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getInstructorsFlow">
+      <set-variable variableName="flowName" value="getInstructorsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="crn" value="#[message.inboundProperties.'http.uri.params'.courseRefNumber]"/>
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.instructionTerm]"/>
+            <add-message-property key="uId" value="#[message.inboundProperties.'http.query.params'.uNumber]"/>
+        </message-properties-transformer>
+        <flow-ref name="getCoursesByInstructorsFlow" doc:name="getCoursesByInstructorsFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:/dwScripts/courseSections/buildGetInstructorsResponse.dwl"/>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],&quot;getInstructorsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getRegistrationsFlow">
+      <set-variable variableName="flowName" value="getRegistrationsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.registrationTerm]"/>
+            <add-message-property key="crn" value="#[message.inboundProperties.'http.uri.params'.courseRefNumber]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Database">
+            <db:parameterized-query><![CDATA[select spriden_id,
+       spriden_first_name,
+       spriden_last_name,
+       sfrstcr.sfrstcr_rsts_code,
+       stvrsts.STVRSTS_DESC,
+       sfrstcr.SFRSTCR_GMOD_CODE,
+       stvgmod.STVGMOD_DESC,
+       sfrstcr.SFRSTCR_GRDE_CODE,
+       sfrstcr.SFRSTCR_GRDE_CODE_MID,
+       sfrstcr.SFRSTCR_LEVL_CODE
+  from sfrstcr
+inner join stvrsts
+on stvrsts_code = sfrstcr.SFRSTCR_RSTS_CODE
+and stvrsts.STVRSTS_INCL_SECT_ENRL = 'Y'
+inner join stvgmod
+on stvgmod.STVGMOD_CODE = sfrstcr.SFRSTCR_GMOD_CODE
+inner join spriden
+on spriden_pidm = sfrstcr.SFRSTCR_PIDM
+and spriden_change_ind is null
+where sfrstcr_term_code = #[flowVars.term]
+and sfrstcr_crn = #[flowVars.crn]]]></db:parameterized-query>
+
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:/dwScripts/courseSections/buildGetRegistrationsResponse.dwl"/>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getRegistrationsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+        <flow name="getInstructorsCourseAssignmentsFlow">
+        <set-variable variableName="flowName" value="getInstructorsCourseAssignmentsFlow" doc:name="Set flow variable for flowName"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.instructionTerm]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="startTerm" value="#[message.inboundProperties.'http.query.params'.startTerm]"/>
+            <add-message-property key="endTerm" value="#[message.inboundProperties.'http.query.params'.endTerm]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.usfId]"/>
+            <add-message-property key="crn" value="#[message.inboundProperties.'http.query.params'.courseRefNumber]"/>
+        </message-properties-transformer>
+        <flow-ref name="getCoursesByInstructorsFlow" doc:name="getCoursesByInstructorsFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"totalRecords":payload[0].total,
+	"data":{
+	
+		"uNumber": payload[0].id,
+		"courseAssignments":payload map ((inst, indexOfCrs) -> {
+		"term":inst.termCode,
+		"primaryInd": inst.primary_ind,
+		"courseRefNumber": inst.crn,
+		"courseLevel" : inst.scrlevl_levl_code,
+		"subject": inst.subj_code,
+		"courseNumber": inst.crse_numb,
+		"title": inst.title,
+		"sectionSession": inst.section_sess,
+		"session": inst.inst_sess,
+		"status" :inst.SSBSECT_SSTS_CODE,
+		"percentSession": inst.sess_percent,
+		"instructorWorkload": inst.inst_workload,
+		"override": inst.override,
+		"enrolledStudents" :inst.section_enrl
+	}),
+	"errors":[]
+}
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],&quot;getInstructorsCourseAssignmentsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </flow>
+    <flow name="getCoursesByInstructorsFlow">
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Instructors for a course section">
+            <db:parameterized-query><![CDATA[select * from 
+(SELECT
+    inst1.*,
+    ROW_NUMBER() OVER(
+        ORDER BY inst1.termcode DESC
+    ) rnum
+FROM
+    (
+        WITH instr AS (
+            SELECT
+                *
+            FROM
+                sibinst
+                JOIN spriden ON
+                    spriden_pidm = sibinst_pidm
+                AND
+                    spriden_change_ind IS NULL
+                AND
+                    spriden_id =#[flowVars.usfId]
+            WHERE
+                sibinst.sibinst_term_code_eff = (
+                    SELECT
+                        MAX(i2.sibinst_term_code_eff)
+                    FROM
+                        sibinst i2
+                    WHERE
+                            i2.sibinst_pidm = sibinst.sibinst_pidm
+                        AND (
+                            (
+                                    #[flowVars.term] IS NOT NULL
+                                AND
+                                    i2.sibinst_term_code_eff <=#[flowVars.term]
+                            ) OR (
+                                    #[flowVars.term] IS NULL
+                                AND (
+                                    (
+                                            #[flowVars.startTerm] IS NOT NULL
+                                        AND
+                                            #[flowVars.endTerm] IS NOT NULL
+                                    ) AND
+                                        i2.sibinst_term_code_eff <= greatest(
+                                            #[flowVars.startTerm],
+                                            #[flowVars.endTerm]
+                                        )
+                                )
+                            )
+                        )
+                )
+        ),instrassign AS (
+            SELECT
+                *
+            FROM
+                sirasgn
+                JOIN instr ON instr.sibinst_pidm = sirasgn.sirasgn_pidm
+            WHERE
+                (
+                        #[flowVars.crn] IS NULL
+                    OR
+                        sirasgn_crn =#[flowVars.crn]
+                ) AND (
+                    (
+                            #[flowVars.term] IS NOT NULL
+                        AND
+                            sirasgn_term_code =#[flowVars.term]
+                    ) OR (
+                            #[flowVars.term] IS NULL
+                        AND
+                            #[flowVars.startTerm] IS NOT NULL
+                        AND
+                            #[flowVars.endTerm] IS NOT NULL
+                        AND
+                            sirasgn_term_code IN (
+                                SELECT
+                                    stvterm_code
+                                FROM
+                                    stvterm
+                                WHERE
+                                    stvterm_code BETWEEN #[flowVars.startTerm] AND #[flowVars.endTerm]
+                            )
+                    )
+                )
+        ),section AS (
+            SELECT
+                *
+            FROM
+                ssbsect s
+                JOIN instrassign ia ON
+                    ia.sirasgn_term_code = s.ssbsect_term_code
+                AND
+                    ia.sirasgn_crn = s.ssbsect_crn
+                JOIN scbcrse c1 ON
+                    c1.scbcrse_subj_code = s.ssbsect_subj_code
+                AND
+                    c1.scbcrse_crse_numb = s.ssbsect_crse_numb
+                AND
+                    c1.scbcrse_eff_term = (
+                        SELECT
+                            MAX(c2.scbcrse_eff_term)
+                        FROM
+                            scbcrse c2
+                        WHERE
+                                c2.scbcrse_subj_code = c1.scbcrse_subj_code
+                            AND
+                                c2.scbcrse_crse_numb = c1.scbcrse_crse_numb
+                            AND
+                                c2.scbcrse_eff_term <= s.ssbsect_term_code
+                    )
+                INNER JOIN scrlevl cl1 ON
+                    cl1.scrlevl_subj_code = s.ssbsect_subj_code
+                AND
+                    cl1.scrlevl_crse_numb = s.ssbsect_crse_numb
+                AND
+                    cl1.scrlevl_eff_term = (
+                        SELECT
+                            MAX(cl2.scrlevl_eff_term)
+                        FROM
+                            scrlevl cl2
+                        WHERE
+                                cl2.scrlevl_subj_code = cl1.scrlevl_subj_code
+                            AND
+                                cl2.scrlevl_crse_numb = cl1.scrlevl_crse_numb
+                            AND
+                                cl2.scrlevl_eff_term <= c1.scbcrse_eff_term
+                    )
+            WHERE
+                s.ssbsect_enrl > 0
+        ) SELECT
+            COUNT(*) OVER() AS total,
+            spriden_id id,
+            spriden_first_name firstname,
+            spriden_last_name lastname,
+            sirasgn_term_code termcode,
+            sirasgn_primary_ind primary_ind,
+            sirasgn_crn crn,
+            ssbsect_subj_code subj_code,
+            ssbsect_crse_numb crse_numb,
+            nvl(
+                ssbsect_crse_title,
+                scbcrse_title
+            ) title,
+            ssbsect_seq_numb section_sess,
+            ssbsect_enrl section_enrl,
+            sirasgn_category inst_sess,
+            TO_CHAR(sirasgn_percent_sess) sess_percent,
+            TO_CHAR(sirasgn_workload_incr) inst_workload,
+            sirasgn_over_ride override,
+            scrlevl_levl_code,
+            ssbsect_ssts_code
+        FROM
+            section
+    ) inst1) t
+    where t.rnum between #[flowVars.initRow] and (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+    </flow>
+</mule>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:core-utils="http://www.mulesoft.org/schema/mule/core-utils"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/api-platform-gw http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+http://www.mulesoft.org/schema/mule/core-utils http://www.mulesoft.org/schema/mule/core-utils/current/mule-core-utils.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <context:property-placeholder location="sys.students.${mule.env}.properties"/>
+        <tls:context name="TLS_Context" doc:name="TLS Context">
+        <tls:key-store type="jks" path="usf-keystore.jks" alias="${jks.alias}" keyPassword="${jks.key.password}" password="${jks.password}"/>
+    </tls:context>
+
+    <apikit:config name="api-config" raml="api.raml" consoleEnabled="false" doc:name="Router"/>
+    <api-platform-gw:api apiName="${api.name}" version="${api.version}" flowRef="api-main" create="true" apikitRef="api-config" doc:name="API Autodiscovery"/> 
+
+    <http:listener-config name="api-httpListenerConfig" protocol="HTTPS" host="${http.host}" port="${https.port}" doc:name="HTTP Listener Configuration" tlsContext-ref="TLS_Context"/>
+
+    <http:request-config name="HTTP_Request_Configuration_Identity" protocol="HTTPS" host="${sys.students.identity.host}" port="${sys.students.identity.port}" basePath="${sys.students.identity.base.path}" doc:name="HTTP Request Configuration"/>
+
+    <core-utils:config name="CoreUtils__Configuration" apiPath="${core.utils.api.path}" apiUrl="${core.utils.api.url}" clientId="${app.client.id}" clientSecret="${app.client.secret}" doc:name="CoreUtils: Configuration"/>
+
+    <db:oracle-config name="Oracle_Configuration_BANNER" url="jdbc:oracle:thin:${banner.user}/${banner.password}@ldap://${banner.ldap}/${banner.instance},cn=OracleContext,dc=it,dc=usf,dc=edu" doc:name="Oracle Configuration">
+        <db:pooling-profile maxPoolSize="5" minPoolSize="1" preparedStatementCacheSize="30" />
+        <reconnect/>
+    </db:oracle-config>
+
+     <db:oracle-config name="Oracle_Configuration_BANNER_NO_POOLING" url="jdbc:oracle:thin:${banner.user}/${banner.password}@ldap://${banner.ldap}/${banner.instance},cn=OracleContext,dc=it,dc=usf,dc=edu" doc:name="Oracle Configuration">
+        <db:pooling-profile maxPoolSize="1" minPoolSize="1" preparedStatementCacheSize="0"/>
+    </db:oracle-config>
+    <db:oracle-config name="Oracle_Configuration_DegreeWorks"      doc:name="Oracle Configuration" url="jdbc:oracle:thin:${degreeWorks.user}/${degreeWorks.password}@ldap://${degreeWorks.ldap}/${degreeWorks.instance},cn=OracleContext,dc=it,dc=usf,dc=edu">
+        <db:pooling-profile maxPoolSize="20" minPoolSize="1" acquireIncrement="1" preparedStatementCacheSize="10"/>
+        <reconnect/>
+    </db:oracle-config>
+
+     <db:generic-config name="FAIR_Database_Configuration" url="jdbc:sqlserver://${fair.ip};user=${fair.user};password=${fair.password}" driverClassName="com.microsoft.sqlserver.jdbc.SQLServerDriver" doc:name="Generic Database Configuration"/>
+    
+    <db:mysql-config name="MySQL_Configuration_AppianDb" host="${appiandb.host}" port="${appiandb.port}" user="${appiandb.user}" password="${appiandb.password}" database="${appiandb.database}" doc:name="MySQL Configuration" connectionTimeout="0">
+        <db:pooling-profile maxPoolSize="1" minPoolSize="1" preparedStatementCacheSize="10"/>
+        <reconnect/>
+    </db:mysql-config>
+
+    <configuration doc:name="Configuration">
+        <expression-language>
+            <import class="java.sql.Date" />
+            <import class="java.text.SimpleDateFormat" />
+            <import class="java.lang.String"/>
+                 <global-functions>
+                     def sqlDate(dateStr) {
+                     	format = new SimpleDateFormat("yyyy-MM-dd");
+                     	jDate = format.parse(dateStr);
+                     	return new java.sql.Date(jDate.getTime());
+                     }
+                 </global-functions>
+             </expression-language>
+         </configuration>
+
+</mule>

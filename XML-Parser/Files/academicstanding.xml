@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+ <flow name="getAcademicStandingPidmFlow">
+        <set-variable variableName="flowName" value="getAcademicStandingPidmFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="pidm"/>
+        <flow-ref name="getAcademicStandingFlow" doc:name="getAcademicStandingFlow"/>
+    </flow>
+
+    <flow name="getAcademicStandingFlow">
+        <set-variable variableName="flowName" value="getAcademicStandingFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Academic Dtanding">
+            <db:parameterized-query><![CDATA[SELECT t.SHRTTRM_ASTD_CODE_END_OF_TERM academicStandingCode,d.stvastd_desc academicStandingDesc
+           FROM   SHRTTRM t,stvastd d
+           WHERE t.shrttrm_astd_code_end_of_term = d.stvastd_code
+           AND   t.shrttrm_pidm = #[flowVars.pidm]
+           and   t.SHRTTRM_TERM_CODE =  (SELECT MAX(tt.SHRTTRM_TERM_CODE)
+                                   FROM   SHRTTRM tt
+                                   WHERE  tt.SHRTTRM_TERM_CODE <= #[flowVars.currentTerm]
+                                   AND  tt.SHRTTRM_PIDM  = t.SHRTTRM_PIDM)]]></db:parameterized-query>
+
+        </db:select>
+        <dw:transform-message doc:name="Transform payload to Java">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((atts , indexOfatts) -> {
+
+		"academicStandingCode" : atts.ACADEMICSTANDINGCODE,
+		"academicStandingDesc" : atts.ACADEMICSTANDINGDESC
+
+	})
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getAcademicStandingFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

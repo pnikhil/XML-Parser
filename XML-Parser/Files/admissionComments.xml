@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="admissionsCommentsDeleteFlow">
+      <set-variable variableName="flowName" value="admissionsCommentsDeleteFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <dw:transform-message doc:name="You have to convert to JAVA for the Message Properties Transform to work properly">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Set the key flowVars for flow">
+            <add-message-property key="term" value="#[payload.term]"/>
+            <add-message-property key="decisionCode" value="#[payload.decisionCode]"/>
+            <add-message-property key="applicationNumber" value="#[payload.applicationNumber]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.studentId]"/>
+            <add-message-property key="pidm" value="#[payload.pidm]"/>
+        </message-properties-transformer>
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="Delete Auto Comments after successfully processing a decision">
+            <db:parameterized-query><![CDATA[call eai.eai_wp_sarappd_del_autocom_db(p_eai_pidm_in => :p_pidm_in,
+			                                         p_eai_term_in => :p_term_in,
+			                                         p_eai_appl_no_in => :p_appl_no_in,
+			                                         p_eai_apdc_code_in => :p_apdc_code_in,
+			                                         p_eai_action_in => :p_action_in,
+			                                         p_eai_success_out => :p_success_out,
+			                                         p_eai_message_out => :p_message_out)]]></db:parameterized-query>
+            <db:in-param name="p_pidm_in" type="NUMERIC" value="#[flowVars.pidm]"/>
+            <db:in-param name="p_term_in" type="VARCHAR" value="#[flowVars.term]"/>
+            <db:in-param name="p_appl_no_in" type="NUMERIC" value="#[flowVars.applicationNumber]"/>
+            <db:in-param name="p_apdc_code_in" type="VARCHAR" value="#[flowVars.decisionCode]"/>
+            <db:in-param name="p_action_in" type="VARCHAR" value="I"/>
+            <db:out-param name="p_success_out" type="NUMERIC"/>
+            <db:out-param name="p_message_out" type="VARCHAR"/>
+        </db:stored-procedure>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": [payload],
+
+	"errors":[]
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;admissionsCommentsDeleteFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

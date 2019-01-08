@@ -1,0 +1,16 @@
+=
+;C:\Projects\XML-Parser\XML-Parser\App_Start\BundleConfig.cs=
+;C:\Projects\XML-Parser\XML-Parser\App_Start\FilterConfig.cs<
+:C:\Projects\XML-Parser\XML-Parser\App_Start\RouteConfig.csG
+EC:\Projects\XML-Parser\XML-Parser\Controllers\FileUploadController.csA
+?C:\Projects\XML-Parser\XML-Parser\Controllers\HomeController.csA
+?C:\Projects\XML-Parser\XML-Parser\Controllers\ViewController.cs2
+0C:\Projects\XML-Parser\XML-Parser\Global.asax.cs:
+8C:\Projects\XML-Parser\XML-Parser\Helpers\FilesHelper.cs=
+;C:\Projects\XML-Parser\XML-Parser\Helpers\RegexValidator.cs8
+6C:\Projects\XML-Parser\XML-Parser\Helpers\XmlHelper.cs6
+4C:\Projects\XML-Parser\XML-Parser\Models\Document.cs<
+:C:\Projects\XML-Parser\XML-Parser\Models\FilesViewModel.cs:
+8C:\Projects\XML-Parser\XML-Parser\Models\XmlViewModel.cs>
+<C:\Projects\XML-Parser\XML-Parser\Properties\AssemblyInfo.csZ
+VC:\Users\nikhiln\AppData\Local\Temp\.NETFramework,Version=v4.6.1.AssemblyAttributes.cs

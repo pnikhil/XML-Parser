@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+   <flow name="getStudentDynamicQuery">
+        <set-variable variableName="flowName" value="getStudentDynamicQuery" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+        <logger message="START-getStudentsDynamicQuery.groovy"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+        <scripting:transformer doc:name="build get students dynamic query">
+            <scripting:script engine="Groovy" file="groovyScripts/getStudentsDynamicQuery.groovy"/>
+        </scripting:transformer>
+        <logger message="FINISH-getStudentsDynamicQuery.groovy"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+        <logger message="START-db:dynamic-query"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Database">
+            <db:dynamic-query><![CDATA[#[payload]]]></db:dynamic-query>
+        </db:select>
+        <logger message="FINISH-db:dynamic-query"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+        <logger message="START-transform-message"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+        <dw:transform-message doc:name="Transform payload to JSON">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="FINISH-transform-message"
+            level="DEBUG" doc:name="Log flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentDynamicQuery&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getStudentsFlow">
+        <set-variable variableName="flowName" value="getStudentsFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <logger message="payload=#[payload]" level="DEBUG" doc:name="Log Payload" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="term" value="201608"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="sortField" value="#[message.inboundProperties.'http.query.params'.sortField]"/>
+            <add-message-property key="sortAscending" value="#[message.inboundProperties.'http.query.params'.sortAscending]"/>
+            <add-message-property key="lastName" value="#[message.inboundProperties.'http.query.params'.lastName!=empty?message.inboundProperties.'http.query.params'.lastName:'']"/>
+            <add-message-property key="cohortCode" value="#[message.inboundProperties.'http.query.params'.cohortCode!=empty?message.inboundProperties.'http.query.params'.cohortCode:'']"/>
+            <add-message-property key="firstName" value="#[message.inboundProperties.'http.query.params'.firstName!=empty?message.inboundProperties.'http.query.params'.firstName:'']"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.query.params'.usfId!=empty?message.inboundProperties.'http.query.params'.usfId:'']"/>
+            <add-message-property key="level" value="#[message.inboundProperties.'http.query.params'.level!=empty?message.inboundProperties.'http.query.params'.level:'']"/>
+            <add-message-property key="status" value="#[message.inboundProperties.'http.query.params'.activeStatus!=empty?message.inboundProperties.'http.query.params'.activeStatus:'']"/>
+            <add-message-property key="collegeCode2" value="#[message.inboundProperties.'http.query.params'.collegeCode2!=empty?message.inboundProperties.'http.query.params'.collegeCode2:'']"/>
+            <add-message-property key="degreeStatus" value="#[message.inboundProperties.'http.query.params'.stuDegreeStatus!=empty?message.inboundProperties.'http.query.params'.stuDegreeStatus:'']"/>
+            <add-message-property key="hasFifPlan" value="#[message.inboundProperties.'http.query.params'.hasFinishFourPlan]"/>
+            <add-message-property key="majorCode2" value="#[message.inboundProperties.'http.query.params'.majorCode2!=empty?message.inboundProperties.'http.query.params'.majorCode2:'']"/>
+            <add-message-property key="isDeceased" value="#[message.inboundProperties.'http.query.params'.isDeceased!=empty?message.inboundProperties.'http.query.params'.isDeceased:'']"/>
+            <add-message-property key="campus" value="#[message.inboundProperties.'http.query.params'.campus!=empty?message.inboundProperties.'http.query.params'.campus:'']"/>
+            <add-message-property key="collegeCode1" value="#[message.inboundProperties.'http.query.params'.collegeCode1!=empty?message.inboundProperties.'http.query.params'.collegeCode1:'']"/>
+            <add-message-property key="majorCode1" value="#[message.inboundProperties.'http.query.params'.majorCode1!=empty?message.inboundProperties.'http.query.params'.majorCode1:'']"/>
+            <add-message-property key="graduatingTerm" value="#[message.inboundProperties.'http.query.params'.graduatingTerm!=empty?message.inboundProperties.'http.query.params'.graduatingTerm:'']"/>
+            <add-message-property key="hasGraduated" value="#[message.inboundProperties.'http.query.params'.hasGraduated!=empty?message.inboundProperties.'http.query.params'.hasGraduated:'']"/>
+            <add-message-property key="scholarshipStatus" value="#[message.inboundProperties.'http.query.params'.scholarshipStatus!=empty?message.inboundProperties.'http.query.params'.scholarshipStatus:'']"/>
+            <add-message-property key="yearsToGrad" value="#[message.inboundProperties.'http.query.params'.potentialYearsToGrad!=empty?java.net.URLEncoder.encode(message.inboundProperties['http.query.params'].potentialYearsToGrad,&quot;UTF-8&quot;):'']"/>
+            <add-message-property key="preCertifiedStatusCode" value="#[message.inboundProperties.'http.query.params'.preCertifiedStatus!=empty?message.inboundProperties.'http.query.params'.preCertifiedStatus:'']"/>
+            <add-message-property key="degreePlanCode" value="#[message.inboundProperties.'http.query.params'.stuDegreePlanCode]"/>
+            <add-message-property key="isNotReturning" value="#[message.inboundProperties.'http.query.params'.isNotReturning]"/>
+        </message-properties-transformer>
+        <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+        <flow-ref name="getStudentDynamicQuery" doc:name="getStudentDynamicQuery"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTAL_RECORDS,
+	"data": payload map ((student) -> {
+		"usfId" : student.USFID,
+		"firstName" : student.FIRSTNAME,
+		"lastName" : student.LASTNAME,
+		"campus" : student.CAMPUS,
+		"cohorts" : (lookup("getCohortPidmFlow",{pidm:student.PIDM}).cohorts),
+		"residenceHall" : student.HALL,
+		"usfEmail" : student.USFEMAIL,
+		"studentLevel" : student.STUDENTLEVEL,
+		"admitType":
+		  {
+		  	"code": student.ADMTCODE,
+		  	"description": student.ADMTDESC
+		  },
+		"status":
+		  {
+		  	"code": student.STATUSCODE,
+		  	"description": student.STATUSDESC
+		  },
+		"currentDegrees": (lookup("getDegreesPidmFlow",{pidm:student.PIDM}).degrees),
+		"priorDegrees": (lookup("getPriorDegreesPidmFlow",{pidm:student.PIDM}).degrees),
+		"trackingFlags": (lookup("getAdvisorsStudentTrackingPidmFlow",{pidm:student.PIDM}).flags)
+	}),
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getStudentsProcFlow">
+        <set-variable variableName="flowName" value="getStudentsProcFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <flow-ref name="getCampusFlow" doc:name="getCampusFlow"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="term" value="201608"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.query.params'.usfId]"/>
+            <add-message-property key="firstName" value="#[message.inboundProperties.'http.query.params'.firstName]"/>
+            <add-message-property key="lastName" value="#[message.inboundProperties.'http.query.params'.lastName]"/>
+            <add-message-property key="campus" value="#[flowVars.campusCode]"/>
+            <add-message-property key="level" value="#[message.inboundProperties.'http.query.params'.level]"/>
+            <add-message-property key="academicStanding" value="#[message.inboundProperties.'http.query.params'.academicStanding]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="sortField" value="#[message.inboundProperties.'http.query.params'.sortField]"/>
+            <add-message-property key="sortAscending" value="#[message.inboundProperties.'http.query.params'.sortAscending]"/>
+            <add-message-property key="cohortCode" value="#[message.inboundProperties.'http.query.params'.cohortCode]"/>
+        </message-properties-transformer>
+        <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="Database" >
+            <db:parameterized-query><![CDATA[call baninst1.get_students_rs(:p_term,
+                           :p_academicstanding,
+                           :p_campus,
+                           :p_firstname,
+                           :p_lastname,
+                           :p_usfid,
+                           :p_cohortCode,
+                           :p_level,
+                           :p_sortfield,
+                           :p_sortascending,
+                           :p_initrow,
+                           :p_maxrows,
+                           :p_recordset)]]></db:parameterized-query>
+            <db:in-param name="p_cohortCode" value="#[flowVars.cohortCode]"/>
+            <db:in-param name="p_term" value="#[flowVars.currentTerm]"/>
+            <db:in-param name="p_academicstanding" value="#[flowVars.academicstanding]"/>
+            <db:in-param name="p_campus" value="#[flowVars.campus]"/>
+            <db:in-param name="p_firstname" value="#[flowVars.firstName]"/>
+            <db:in-param name="p_lastname" value="#[flowVars.lastName]"/>
+            <db:in-param name="p_usfid" value="#[flowVars.usfId]"/>
+            <db:in-param name="p_level" value="#[flowVars.level]"/>
+            <db:in-param name="p_sortfield" value="#[flowVars.sortField]"/>
+            <db:in-param name="p_sortascending" value="#[flowVars.sortAscending]"/>
+            <db:in-param name="p_initrow" value="#[flowVars.initRow]"/>
+            <db:in-param name="p_maxrows" value="#[flowVars.maxRows]"/>
+            <db:out-param name="p_recordset" type="CURSOR"/>
+        </db:stored-procedure>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:dwScripts/buildGetStudentsResponse.dwl"/>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentsProcFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getStudentInfoFlow">
+        <set-variable variableName="flowName" value="getStudentInfoFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+
+        <flow-ref name="getStudentMainInfoFlow" doc:name="getStudentMainInfoFlow"/>
+        <flow-ref name="getStudentsDetailsFlow" doc:name="getStudentsDetailsFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+%var majorsArray = flatten flowVars.stuCurriculum.curriculums.fieldOfStudy.*majors
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": flowVars.mainPayload map ((student) -> {
+        "usfId" : student.USFID,
+		"firstName" : student.FIRSTNAME,
+		"middleName": student.MIDDLENAME,
+		"lastName" : student.LASTNAME,
+		"usfEmail" : flowVars.email[0].usfEmail,
+		"prefPhoneNumber" : flowVars.address[0].phone,
+		"dateOfBirth" : student.DOB,
+		"status":
+		  {
+		  	"code": student.STATUSCODE,
+		  	"description": student.STATUSDESCRIPTION
+		  },
+		"cohorts" : flowVars.cohort.cohorts,
+		"campus" : student.CAMPUS,
+		"residenceHall" : "UNDEFINED" when flowVars.residence[0].hall == null otherwise  flowVars.residence[0].hall,
+		"academicStanding":  flowVars.academicStanding,
+		"residency" :student.RESIDENCY,
+		"catalogYear" :student.CATALOGYEAR,
+		"studentLevel" : student.STUDENTLEVEL,
+		"studentType" : student.STUDENTTYPE,
+		"gender" : student.GENDER,
+		"gpa" :  flowVars.gpaHours.gpa,
+		"hours": {
+			"attemptedHours":flowVars.gpaHours.hours.attemptedHours,
+			"earnedHours": flowVars.gpaHours.hours.earnedHours,
+			"excessHours": flowVars.gpaHours.excessHours,
+			"registeredHours":flowVars.gpaHours.registeredHours
+			},
+		"fyr" : "false" when flowVars.attributes[0] == null otherwise ("true" when flowVars.attributes.attsCode contains "FYR" otherwise "false"),
+		"isReselection" : "false" when majorsArray[0] == null otherwise ("true" when majorsArray.code contains "RSL" otherwise "false"),
+		"isAthelete" : "false" when flowVars.attributes[0] == null otherwise ("true" when flowVars.attributes.attsCode contains "ATHL" otherwise "false"),
+		"otherAttributes" : flowVars.attributes,
+		"holds" : flowVars.holds.holds,
+		"registrationHold" : "false" when flowVars.holds.holds[0] == null otherwise (("true") when flowVars.holds.holds.holdFunctionDesc contains 'Registration' otherwise ("false")),
+		"numberOfMajorChanges": 999,
+		"curriculums" : flowVars.stuCurriculum.curriculums,
+		"netId" : flowVars.netId,
+		"outstandingBalance" : flowVars.outstandingBalance[0].OUTSTANDINGBALANCE,
+		"classification" : flowVars.classification[0].CLASDESC,
+		"currentRegistration" : flowVars.registration.registrations.currentRegistration,
+		"futureRegistration" :  flowVars.registration.registrations.futureRegistration,
+		"currentlyRegistered" : ("false")  when  (flowVars.registration.registrations.currentRegistration[0] == null ) otherwise ("true"),
+		"registeredNextTerm" : ("false") when (flowVars.registration.registrations.futureRegistration[0] == null) otherwise ("true"),
+		"trackingFlags": (lookup("getAdvisorsStudentTrackingPidmFlow",{pidm:student.PIDM}).flags),
+		"currentDegreeList": (lookup("getDegreesPidmFlow",{pidm:student.PIDM}).degrees),
+		"priorDegreeList": (lookup("getPriorDegreesPidmFlow",{pidm:student.PIDM}).degrees)
+	}),
+	"errors":[]
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentInfoFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getStudentMainInfoFlow">
+        <set-variable variableName="flowName" value="getStudentMainInfoFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <scatter-gather doc:name="Scatter-Gather">
+			<flow-ref name="getEmailFlow" doc:name="getEmailFlow"/>
+			<flow-ref name="getAddressFlow" doc:name="getAddressFlow"/>
+			<flow-ref name="getCohortFlow" doc:name="getCohortFlow"/>
+			<flow-ref name="getResFlow" doc:name="getResFlow"/>
+			<flow-ref name="getAcademicStandingFlow" doc:name="getAcademicStandingFlow"/>
+        </scatter-gather>
+        <set-variable variableName="email" value="#[payload[0]]" mimeType="application/java" doc:name="email"/>
+        <set-variable variableName="address" value="#[payload[1]]" mimeType="application/java" doc:name="address"/>
+        <set-variable variableName="cohort" value="#[payload[2]]" mimeType="application/java" doc:name="cohort"/>
+        <set-variable variableName="residence" value="#[payload[3]]" mimeType="application/json" doc:name="residence"/>
+        <set-variable variableName="academicStanding" value="#[payload[4]]" mimeType="application/json" doc:name="academicStanding"/>
+
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentMainInfoFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getStudentsDetailsFlow">
+        <set-variable variableName="flowName" value="getStudentsDetailsFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <scatter-gather doc:name="Scatter-Gather">
+            <flow-ref name="getStudentHoldsFlow" doc:name="getStudentHoldsFlow"/>
+            <dw:transform-message doc:name="getStudentNetId">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+"netId":(lookup("genericIdentityLookupFlow",{
+				"originalType":"usfid",
+				"originalValue":flowVars.usfId,
+				"requiredType":"netid"
+			}).data.netid)]]></dw:set-payload>
+            </dw:transform-message>
+            <flow-ref name="getStudentAttrFlow" doc:name="getStudentAttrFlow"/>
+            <flow-ref name="getStudentCurriculum" doc:name="getStudentCurriculum"/>
+            <flow-ref name="getAllHoursAndGpaFlow" doc:name="getAllHoursAndGpaFlow"/>
+
+            <flow-ref name="getAccountFlow" doc:name="getAccountFlow"/>
+            <flow-ref name="getClassificationFlow" doc:name="getClassificationFlow"/>
+            <flow-ref name="getRegistrationFlow" doc:name="getRegistrationFlow"/>
+
+        </scatter-gather>
+        <set-variable variableName="holds" value="#[payload[0]]" mimeType="application/json" doc:name="holds"/>
+        <set-variable variableName="netId" value="#[payload[1].'netId']" doc:name="netId"/>
+        <set-variable variableName="attributes" value="#[payload[2]]" mimeType="application/json" doc:name="attributes"/>
+        <set-variable variableName="stuCurriculum" value="#[payload[3]]" mimeType="application/json" doc:name="stuCurriculum"/>
+        <set-variable variableName="gpaHours" value="#[payload[4]]" mimeType="application/java" doc:name="gpa"/>
+
+        <set-variable variableName="outstandingBalance" value="#[payload[5]]" mimeType="application/json" doc:name="outstandingBalance"/>
+        <set-variable variableName="classification" value="#[payload[6]]" mimeType="application/json" doc:name="classification"/>
+        <set-variable variableName="registration" value="#[payload[7]]" mimeType="application/json" doc:name="registration"/>
+
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentsDetailsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getSearchStudentsFlow">
+        <set-variable variableName="flowName" value="getSearchStudentsFlow" doc:name="Set flowName to getSearchStudentsFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <message-properties-transformer scope="invocation" doc:name="Capture Message Properties">
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="sortField" value="#[message.inboundProperties.'http.query.params'.sortField]"/>
+            <add-message-property key="sortAscending" value="#[message.inboundProperties.'http.query.params'.sortAscending]"/>
+            <add-message-property key="cohortCode" value="#[message.inboundProperties.'http.query.params'.cohortCode!=empty?message.inboundProperties.'http.query.params'.cohortCode:'']"/>
+            <add-message-property key="level" value="#[message.inboundProperties.'http.query.params'.level!=empty?message.inboundProperties.'http.query.params'.level:'']"/>
+            <add-message-property key="status" value="#[message.inboundProperties.'http.query.params'.activeStatus!=empty?message.inboundProperties.'http.query.params'.activeStatus:'']"/>
+            <add-message-property key="degreeStatus" value="#[message.inboundProperties.'http.query.params'.stuDegreeStatus!=empty?message.inboundProperties.'http.query.params'.stuDegreeStatus:'']"/>
+            <add-message-property key="hasFifPlan" value="#[message.inboundProperties.'http.query.params'.hasFinishFourPlan]"/>
+            <add-message-property key="isDeceased" value="#[message.inboundProperties.'http.query.params'.isDeceased!=empty?message.inboundProperties.'http.query.params'.isDeceased:'']"/>
+            <add-message-property key="campus" value="#[message.inboundProperties.'http.query.params'.campus!=empty?message.inboundProperties.'http.query.params'.campus:'']"/>
+            <add-message-property key="graduatingTerm" value="#[message.inboundProperties.'http.query.params'.graduatingTerm!=empty?message.inboundProperties.'http.query.params'.graduatingTerm:'']"/>
+            <add-message-property key="hasGraduated" value="#[message.inboundProperties.'http.query.params'.hasGraduated!=empty?message.inboundProperties.'http.query.params'.hasGraduated:'']"/>
+            <add-message-property key="scholarshipStatus" value="#[message.inboundProperties.'http.query.params'.scholarshipStatus!=empty?message.inboundProperties.'http.query.params'.scholarshipStatus:'']"/>
+            <add-message-property key="yearsToGrad" value="#[message.inboundProperties.'http.query.params'.potentialYearsToGrad!=empty?java.net.URLEncoder.encode(message.inboundProperties['http.query.params'].potentialYearsToGrad,&quot;UTF-8&quot;):'']"/>
+            <add-message-property key="preCertifiedStatusCode" value="#[message.inboundProperties.'http.query.params'.preCertifiedStatus!=empty?message.inboundProperties.'http.query.params'.preCertifiedStatus:'']"/>
+            <add-message-property key="degreePlanCode" value="#[message.inboundProperties.'http.query.params'.stuDegreePlanCode]"/>
+            <add-message-property key="isNotReturning" value="#[message.inboundProperties.'http.query.params'.isNotReturning]"/>
+            <add-message-property key="collegeCode" value="#[message.inboundProperties.'http.query.params'.collegeCode!=empty?message.inboundProperties.'http.query.params'.collegeCode:'']"/>
+            <add-message-property key="instMaxGPA" value="#[message.inboundProperties.'http.query.params'.instMaxGPA!=empty?message.inboundProperties.'http.query.params'.instMaxGPA:'']"/>
+            <add-message-property key="excessHours" value="#[message.inboundProperties.'http.query.params'.excessHours!=empty?message.inboundProperties.'http.query.params'.excessHours:'']"/>
+            <add-message-property key="academicStanding" value="#[message.inboundProperties.'http.query.params'.academicStanding!=empty?message.inboundProperties.'http.query.params'.academicStanding:'']"/>
+            <add-message-property key="admitTerm" value="#[message.inboundProperties.'http.query.params'.admitTerm!=empty?message.inboundProperties.'http.query.params'.admitTerm:'']"/>
+            <add-message-property key="attribute" value="#[message.inboundProperties.'http.query.params'.attribute!=empty?message.inboundProperties.'http.query.params'.attribute:'']"/>
+            <add-message-property key="instMinGPA" value="#[message.inboundProperties.'http.query.params'.instMinGPA!=empty?message.inboundProperties.'http.query.params'.instMinGPA:'']"/>
+            <add-message-property key="residenceHall" value="#[message.inboundProperties.'http.query.params'.residenceHall!=empty?message.inboundProperties.'http.query.params'.residenceHall:'']"/>
+            <add-message-property key="admitType" value="#[message.inboundProperties.'http.query.params'.admitType!=empty?message.inboundProperties.'http.query.params'.admitType:'']"/>
+            <add-message-property key="majorCode" value="#[message.inboundProperties.'http.query.params'.majorCode!=empty?message.inboundProperties.'http.query.params'.majorCode:'']"/>
+            <add-message-property key="currRegisteredHours" value="#[message.inboundProperties.'http.query.params'.currRegisteredHours!=empty?message.inboundProperties.'http.query.params'.currRegisteredHours:'']"/>
+            <add-message-property key="isRegisteredNextTerm" value="#[message.inboundProperties.'http.query.params'.isRegisteredNextTerm!=empty?message.inboundProperties.'http.query.params'.isRegisteredNextTerm:'']"/>
+            <add-message-property key="firstName" value="#[message.inboundProperties.'http.query.params'.firstName!=empty?message.inboundProperties.'http.query.params'.firstName.toUpperCase():'']"/>
+            <add-message-property key="lastName" value="#[message.inboundProperties.'http.query.params'.lastName!=empty?message.inboundProperties.'http.query.params'.lastName.toUpperCase():'']"/>
+            <add-message-property key="concentrationCode" value="#[message.inboundProperties.'http.query.params'.concentrationCode!=empty?message.inboundProperties.'http.query.params'.concentrationCode:'']"/>
+            <add-message-property key="overallMinGPA" value="#[message.inboundProperties.'http.query.params'.overallMinGPA!=empty?message.inboundProperties.'http.query.params'.overallMinGPA:'']"/>
+            <add-message-property key="overallMaxGPA" value="#[message.inboundProperties.'http.query.params'.overallMaxGPA!=empty?message.inboundProperties.'http.query.params'.overallMaxGPA:'']"/>
+            <add-message-property key="transferMinGPA" value="#[message.inboundProperties.'http.query.params'.transferMinGPA!=empty?message.inboundProperties.'http.query.params'.transferMinGPA:'']"/>
+            <add-message-property key="transferMaxGPA" value="#[message.inboundProperties.'http.query.params'.transferMaxGPA!=empty?message.inboundProperties.'http.query.params'.transferMaxGPA:'']"/>
+            <add-message-property key="minRegHours" value="#[message.inboundProperties.'http.query.params'.minRegHours!=empty?message.inboundProperties.'http.query.params'.minRegHours:'']"/>
+            <add-message-property key="maxRegHours" value="#[message.inboundProperties.'http.query.params'.maxRegHours!=empty?message.inboundProperties.'http.query.params'.maxRegHours:'']"/>
+            
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Query allStudents from materialized view">
+            <db:parameterized-query><![CDATA[select * from (SELECT /*+ first_rows(10) */
+    a.*, rownum rnum
+FROM
+    (
+        WITH srchstudents AS (
+            SELECT DISTINCT
+                spriden_first_name,
+                spriden_last_name,
+                spriden_id,
+                sgbstdn_camp_code,
+                sgbstdn_degc_code_1,
+                sgbstdn_majr_code_1,
+                sgbstdn_majr_code_2,
+                sgbstdn_majr_code_conc_1,
+                sgbstdn_majr_code_conc_2,
+                usfgpa,
+                overallgpa,
+                transfergpa,
+                firstterm_attended,
+                lastterm_completed,
+                currregisteredhrs,
+                shrttrm_astd_code_end_of_term
+            FROM
+                eai.allstudents_mv
+            WHERE
+                (
+                        #[flowVars.firstName] IS NULL
+                    OR
+                        spriden_search_first_name = #[flowVars.firstName]
+                ) AND (
+                        #[flowVars.lastName] IS NULL
+                    OR
+                        spriden_search_last_name = #[flowVars.lastName]
+                ) AND (
+                        #[flowVars.cohortCode] IS NULL
+                    OR
+                        chrtcode = #[flowVars.cohortCode]
+                ) AND (
+                        #[flowVars.campus] IS NULL
+                    OR
+                        sgbstdn_camp_code = #[flowVars.campus]
+                ) AND (
+                        #[flowVars.status] IS NULL
+                    OR
+                        sgbstdn_stst_code = #[flowVars.status]
+                ) AND (
+                        #[flowVars.collegeCode] IS NULL
+                    OR (
+                            sgbstdn_coll_code_1 = #[flowVars.collegeCode]
+                        OR
+                            sgbstdn_coll_code_2 = #[flowVars.collegeCode]
+                    )
+                ) AND (
+                        #[flowVars.majorCode] IS NULL
+                    OR (
+                            sgbstdn_majr_code_1 = #[flowVars.majorCode]
+                        OR
+                            sgbstdn_majr_code_2 = #[flowVars.majorCode]
+                    )
+                ) AND (
+                       #[flowVars.concentrationCode] IS NULL
+                    OR (
+                            sgbstdn_majr_code_conc_1 = #[flowVars.concentrationCode]
+                        OR
+                            sgbstdn_majr_code_conc_2 = #[flowVars.concentrationCode]
+                    )
+                ) AND (
+                        #[flowVars.graduatingTerm] IS NULL
+                    OR
+                        anticipatedgradterm = #[flowVars.graduatingTerm]
+                ) AND (
+                        #[flowVars.hasFifPlan] IS NULL
+                    OR (
+                                (
+                                        #[flowVars.hasFifPlan] = 0
+                                    AND (
+                                            hasfifgradplan IS NULL
+                                        OR
+                                            hasfifgradplan = #[flowVars.hasFifPlan]
+                                    )
+                                ) OR
+                                    hasfifgradplan = #[flowVars.hasFifPlan]
+                            )
+                ) AND (
+                        #[flowVars.scholarshipStatus] IS NULL
+                    OR
+                        scholarshipstatus = #[flowVars.scholarshipStatus]
+                ) AND (
+                        #[flowVars.yearsToGrad] IS NULL
+                    OR
+                        potentialyeartograd = #[flowVars.yearsToGrad]
+                ) AND (
+                        #[flowVars.hasGraduated] IS NULL
+                    OR
+                        (
+                                (
+                                        #[flowVars.hasGraduated] = 'N'
+                                    AND (
+                                        nvl(
+                                            hasbachelorsdeg,
+                                            'N'
+                                        ) =#[flowVars.hasGraduated]
+                                    )
+                                ) OR
+                                    hasbachelorsdeg =#[flowVars.hasGraduated]
+                            )
+                ) AND (
+                        #[flowVars.preCertifiedStatusCode] IS NULL
+                    OR
+                        precertificationstatus = #[flowVars.preCertifiedStatusCode]
+                ) AND (
+                        #[flowVars.isNotReturning] IS NULL
+                    OR
+                        isstudentnotreturning = #[flowVars.isNotReturning]
+                ) AND (
+                        #[flowVars.degreeStatus] IS NULL
+                    OR
+                        currtermdegstatus = #[flowVars.degreeStatus]
+                ) AND (
+                        #[flowVars.isDeceased] IS NULL
+                    OR (
+                                (
+                                        #[flowVars.isDeceased] = 'N'
+                                    AND
+                                        spbpers_dead_ind IS NULL
+                                ) OR
+                                    spbpers_dead_ind = #[flowVars.isDeceased]
+                            )
+                ) AND (
+                        #[flowVars.level] IS NULL
+                    OR
+                        sgbstdn_levl_code = #[flowVars.level]
+                ) AND (
+                        #[flowVars.residenceHall] IS NULL
+                    OR
+                        residencehall LIKE '%' || #[flowVars.residenceHall] || '%'
+                ) AND (
+                        #[flowVars.currRegisteredHours] IS NULL
+                    OR
+                        currregisteredhrs = #[flowVars.currRegisteredHours]
+                ) AND (
+                        (
+                          #[flowVars.minRegHours] IS NULL
+                            AND
+                              #[flowVars.maxRegHours] IS NULL
+                            ) OR (
+                                (
+                                    (
+                                            #[flowVars.minRegHours] IS NOT NULL
+                                        AND
+                                            #[flowVars.maxRegHours] IS NULL
+                                    ) AND
+                                        currregisteredhrs >= #[flowVars.minRegHours]
+                                ) OR (
+                                    (
+                                        (
+                                                #[flowVars.minRegHours] IS NULL
+                                            AND
+                                                #[flowVars.maxRegHours] IS NOT NULL
+                                        ) AND
+                                            currregisteredhrs <= #[flowVars.maxRegHours]
+                                    )
+                                ) OR (
+                                        #[flowVars.minRegHours] IS NOT NULL
+                                    AND
+                                        #[flowVars.maxRegHours] IS NOT NULL
+                                    AND
+                                        currregisteredhrs BETWEEN #[flowVars.minRegHours] AND #[flowVars.maxRegHours]
+                                )
+                            )
+                        )
+                AND (
+                        #[flowVars.isRegisteredNextTerm] IS NULL
+                    OR
+                        regnextterm = #[flowVars.isRegisteredNextTerm]
+                )AND (
+                        #[flowVars.academicStanding] IS NULL
+                    OR
+                        SHRTTRM_ASTD_CODE_END_OF_TERM = #[flowVars.academicStanding]
+                ) AND (
+                        #[flowVars.excessHours] IS NULL
+                    OR
+                        excesshrs = #[flowVars.excessHours]
+                ) AND (
+                        #[flowVars.attribute] IS NULL
+                    OR
+                        attrs = #[flowVars.attribute]
+                ) AND (
+                        #[flowVars.admitType] IS NULL
+                    OR
+                        sgbstdn_admt_code = #[flowVars.admitType]
+                ) AND (
+                        #[flowVars.admitTerm] IS NULL
+                    OR
+                        sgbstdn_term_code_admit = #[flowVars.admitTerm]
+                ) AND (
+                    (
+                            #[flowVars.instMinGPA] IS NULL
+                        AND
+                            #[flowVars.instMaxGPA] IS NULL
+                    ) OR (
+                        (
+                            (
+                                    #[flowVars.instMinGPA] IS NOT NULL
+                                AND
+                                    #[flowVars.instMaxGPA] IS NULL
+                            ) AND
+                                usfgpa >= #[flowVars.instMinGPA]
+                        ) OR (
+                            (
+                                (
+                                        #[flowVars.instMinGPA] IS NULL
+                                    AND
+                                        #[flowVars.instMaxGPA] IS NOT NULL
+                                ) AND
+                                    usfgpa <= #[flowVars.instMaxGPA]
+                            )
+                        ) OR (
+                                #[flowVars.instMinGPA] IS NOT NULL
+                            AND
+                                #[flowVars.instMaxGPA] IS NOT NULL
+                            AND
+                                usfgpa BETWEEN #[flowVars.instMinGPA] AND #[flowVars.instMaxGPA]
+                        )
+                    )
+                ) AND (
+                            (
+                                    #[flowVars.overallMinGPA] IS NULL
+                                AND
+                                    #[flowVars.overallMaxGPA] IS NULL
+                            ) OR (
+                                (
+                                    (
+                                            #[flowVars.overallMinGPA] IS NOT NULL
+                                        AND
+                                            #[flowVars.overallMaxGPA] IS NULL
+                                    ) AND
+                                        overallgpa >= #[flowVars.overallMinGPA]
+                                ) OR (
+                                    (
+                                        (
+                                                #[flowVars.overallMinGPA] IS NULL
+                                            AND
+                                                #[flowVars.overallMaxGPA] IS NOT NULL
+                                        ) AND
+                                            overallgpa <= #[flowVars.overallMaxGPA]
+                                    )
+                                ) OR (
+                                        #[flowVars.overallMinGPA] IS NOT NULL
+                                    AND
+                                        #[flowVars.overallMaxGPA] IS NOT NULL
+                                    AND
+                                        overallgpa BETWEEN #[flowVars.overallMinGPA] AND #[flowVars.overallMaxGPA]
+                                )
+                            )
+                        ) AND (
+                            (
+                                    #[flowVars.transferMinGPA] IS NULL
+                                AND
+                                    #[flowVars.transferMaxGPA] IS NULL
+                            ) OR (
+                                (
+                                    (
+                                            #[flowVars.transferMinGPA] IS NOT NULL
+                                        AND
+                                            #[flowVars.transferMaxGPA] IS NULL
+                                    ) AND
+                                        transfergpa >= #[flowVars.transferMinGPA]
+                                ) OR (
+                                    (
+                                        (
+                                                #[flowVars.transferMinGPA] IS NULL
+                                            AND
+                                                #[flowVars.transferMaxGPA] IS NOT NULL
+                                        ) AND
+                                            transfergpa <= #[flowVars.transferMaxGPA]
+                                    )
+                                ) OR (
+                                        #[flowVars.transferMinGPA] IS NOT NULL
+                                    AND
+                                        #[flowVars.transferMaxGPA] IS NOT NULL
+                                    AND
+                                        transfergpa BETWEEN #[flowVars.transferMinGPA] AND #[flowVars.transferMaxGPA]
+                                )
+                            )
+                        )
+        ) SELECT
+            COUNT(*) OVER() totalrecords,
+            srchstudents.*
+        FROM
+            srchstudents
+        ORDER BY
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'firstName'
+                    AND
+                        #[flowVars.sortAscending] = 'true'
+                    THEN spriden_first_name
+                END
+            ASC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'firstName'
+                    AND
+                        #[flowVars.sortAscending] = 'false'
+                    THEN spriden_first_name
+                END
+            DESC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'lastName'
+                    AND
+                        #[flowVars.sortAscending] = 'true'
+                    THEN spriden_last_name
+                END
+            ASC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'lastName'
+                    AND
+                        #[flowVars.sortAscending] = 'false'
+                    THEN spriden_last_name
+                END
+            DESC
+    ) a) b
+where rnum between #[flowVars.initRow] and (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var campusDescription = {'T':'Tampa','P':'St. Petersburg','S':'Sarasota-Manatee','F':'Fort Myers',
+	                      'N':'New College','L':'Lakeland','M':'Medicine','1':'Off-campus - Tampa',
+	                      '2':'Off-campus - Lakeland','3':'Off-campus - Sarasota','4':'Off-campus - St. Petersburg',
+	                      '5':'Off-campus - Fort Myers','0':'Telecourse  - Ft. Myers','6':'Telecourse - St. Petersburg',
+	                      '7':'Telecourse - Sarasota','8':'Telecourse - Lakeland','9':'Telecourse - Tampa',
+	                      'C':'Off Campus Special Programs'}
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTALRECORDS,
+	"data": payload map ((student) -> {
+		"usfId": student.SPRIDEN_ID,
+		"firstName": student.SPRIDEN_FIRST_NAME,
+		"lastName": student.SPRIDEN_LAST_NAME,
+		"campus": campusDescription[student.SGBSTDN_CAMP_CODE],
+		"degree": student.sgbstdn_degc_code_1,
+		"majors": {
+			"primary": student.sgbstdn_majr_code_1,
+		    "secondary": student.sgbstdn_majr_code_2
+		    },
+		"concentrations": {
+		  "primary": student.sgbstdn_majr_code_conc_1,
+		  "secondary": student.sgbstdn_majr_code_conc_2
+		  },
+		"firstTermEnrolled": student.firstterm_attended,
+		"lastTermCompleted": student.lastterm_completed,
+		"academicStanding": student.shrttrm_astd_code_end_of_term,
+		"enrolledInCurrentTerm": false when student.currregisteredhrs == null
+		otherwise true when student.currregisteredhrs != 0
+		otherwise false,
+		"overallGpa": student.overallgpa,
+		"currentCreditHours": student.currregisteredhrs
+	}),
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getSearchStudentsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </flow>
+</mule>

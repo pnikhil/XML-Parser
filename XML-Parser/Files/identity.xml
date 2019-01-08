@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <flow name="identity-management-studentByUsfIdFlow">
+      <set-variable variableName="flowName" value="identity-management-studentByUsfIdFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <http:request config-ref="HTTP_Request_Configuration_Identity" path="/convert" method="GET" doc:name="HTTP Call to GET Convert Operator Id - Bz Admin Identity">
+            <http:request-builder>
+                <http:query-param paramName="submit_type" value="usfid"/>
+                <http:query-param paramName="value" value="#[flowVars.usfId]"/>
+                <http:query-param paramName="return_type" value="netid"/>
+                <http:query-param paramName="return" value="json"/>
+                <http:header headerName="client_id" value="${app.client.id}"/>
+                <http:header headerName="client_secret" value="${app.client.secret}"/>
+            </http:request-builder>
+        </http:request>
+        <dw:transform-message doc:name="Transform Response to Java">
+            <dw:set-payload resource="classpath:dwScripts/transformPayloadToJava.dwl"/>
+        </dw:transform-message>
+    </flow>
+    <flow name="sisIdentityFlow">
+      <set-variable variableName="flowName" value="sisIdentityFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get student system identifier">
+            <db:parameterized-query><![CDATA[select spriden.SPRIDEN_ID,
+       spriden.SPRIDEN_PIDM,
+       spriden.SPRIDEN_FIRST_NAME,
+       spriden.SPRIDEN_LAST_NAME,
+       spriden.SPRIDEN_MI,
+       SATURN.SPBPERS.SPBPERS_BIRTH_DATE,
+       SATURN.SPBPERS.SPBPERS_ETHN_CODE,
+       SATURN.SPBPERS.SPBPERS_SEX,
+       SATURN.SPBPERS.SPBPERS_CONFID_IND,
+       SATURN.SPBPERS.SPBPERS_CITZ_CODE,
+       SATURN.SPBPERS.SPBPERS_CITZ_IND,
+       SATURN.SPBPERS.SPBPERS_ARMED_SERV_MED_VET_IND
+from spriden
+inner join SATURN.SPBPERS
+on SATURN.SPBPERS.SPBPERS_PIDM = spriden_pidm
+where spriden_id = #[flowVars.uNumber]
+and spriden_change_ind is null;]]></db:parameterized-query>
+        </db:select>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;sisIdentityFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+</mule>

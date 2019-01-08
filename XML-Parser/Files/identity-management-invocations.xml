@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+	 <flow name="genericIdentityLookupFlow">
+        <set-variable variableName="arguments" value="#[payload]" doc:name="Variable"/>
+        
+        <http:request config-ref="HTTP_Request_Configuration_Identity" path="/convert" method="GET" doc:name="HTTP Call to GET Convert - Bz Admin Identity">           
+            <http:request-builder>
+                <http:query-param paramName="submit_type" value="#[payload.originalType]"/>
+                <http:query-param paramName="value" value="#[payload.originalValue]"/>
+                <http:query-param paramName="return_type" value="#[payload.requiredType]"/>
+                <http:query-param paramName="return" value="json"/>
+                <http:header headerName="client_id" value="${app.client.id}"/>
+                <http:header headerName="client_secret" value="${app.client.secret}"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="200,400"/>
+        </http:request>
+        
+        <dw:transform-message doc:name="Transform payload to Java">
+            <dw:set-payload resource="classpath:dwScripts/transformPayloadToJava.dwl"/>
+        </dw:transform-message>
+        
+        <choice doc:name="Choice between response codes">
+            <when expression="#[payload.responseCode == 0]">
+                <dw:transform-message doc:name="Transform Response to Java">
+                    <dw:set-payload resource="classpath:dwScripts/transformPayloadToJava.dwl"/>
+                </dw:transform-message>
+            </when>
+            
+            <when expression="#[payload.responseCode == -2 &amp;&amp; (payload.errors.reason == &quot;User does not have a USFid&quot; || payload.errors.reason == &quot;Identifier does not exist&quot;)]">
+                <dw:transform-message doc:name="replace no return value errors with success but empty string">
+                    <dw:set-payload resource="classpath:dwScripts/identity/convertNoIdErrorToNullIdSuccess.dwl"/>
+                </dw:transform-message>           	
+            </when>
+            
+            <otherwise>
+                <dw:transform-message doc:name="Build empty response">
+                    <dw:set-payload resource="classpath:dwScripts/identity/buildEmptyResponse.dwl"/>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

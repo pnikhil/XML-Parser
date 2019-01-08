@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="getCurriculumsFlow">
+        <set-variable variableName="flowName" value="getCurriculumsFlow" doc:name="Variable"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get curriculums data">
+            <db:parameterized-query><![CDATA[select
+r.sovlcur_coll_code ,
+r.SOVLCUR_CURR_RULE,
+r.sovlcur_key_seqno,
+r.sovlcur_seqno,
+l.stvcoll_desc,
+f.sovlfos_dept_code,
+de.stvdept_desc,
+r.sovlcur_degc_code ,
+d.stvdegc_desc,
+r.sovlcur_term_code,
+f.sovlfos_seqno,
+f.sovlfos_lfst_code,
+decode(f.sovlfos_lfst_code,'MAJOR',1,'CONCENTRATION',2,'MINOR',3,4) lfstCodeSort,
+f.sovlfos_majr_code,
+mj.stvmajr_desc,
+f.sovlfos_conc_attach_majr_code,
+f.sovlfos_majr_code_attach
+FROM sovlcur r
+INNER JOIN sovlfos f
+ON(f.sovlfos_lcur_seqno =r.sovlcur_seqno
+AND f.sovlfos_pidm = r.sovlcur_pidm
+AND f.sovlfos_current_ind = 'Y'
+AND f.sovlfos_active_ind ='Y')
+LEFT OUTER JOIN Stvcoll l
+ON(l.stvcoll_code = r.sovlcur_coll_code)
+LEFT OUTER JOIN stvdegc d
+ON(d.stvdegc_code = r.sovlcur_degc_code)
+LEFT OUTER JOIN stvdept de
+ON(de.stvdept_code = f.sovlfos_dept_code)
+LEFT OUTER JOIN stvmajr mj
+ON(mj.stvmajr_code = f.sovlfos_majr_code)
+WHERE r.sovlcur_pidm = #[flowVars.pidm]
+AND r.sovlcur_lmod_code= #[flowVars.curriculumMode]
+AND r.sovlcur_current_ind = 'Y'
+AND r.sovlcur_active_ind = 'Y'
+order by r.sovlcur_term_code desc,
+    r.sovlcur_seqno desc,
+    r.sovlcur_priority_no, 
+    r.sovlcur_curr_rule desc, 
+    lfstCodeSort]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentCurriculum&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </flow>
+   <flow name="getStudentCurriculum">
+        <set-variable variableName="flowName" value="getStudentCurriculum" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Curriculums Data">
+            <db:parameterized-query><![CDATA[select
+r.sovlcur_coll_code ,
+r.SOVLCUR_CURR_RULE,
+l.stvcoll_desc,
+f.sovlfos_dept_code,
+de.stvdept_desc,
+r.sovlcur_degc_code ,
+d.stvdegc_desc,
+r.sovlcur_term_code,
+f.sovlfos_lfst_code,
+decode(f.sovlfos_lfst_code,'MAJOR',1,'CONCENTRATION',2,'MINOR',3,4) lfstCodeSort,
+f.sovlfos_majr_code,
+mj.stvmajr_desc,
+f.sovlfos_conc_attach_majr_code,
+f.sovlfos_majr_code_attach
+FROM sovlcur r
+INNER JOIN sovlfos f
+ON(f.sovlfos_lcur_seqno =r.sovlcur_seqno
+AND f.sovlfos_pidm = r.sovlcur_pidm
+AND f.sovlfos_current_ind = 'Y'
+AND f.sovlfos_active_ind ='Y')
+LEFT OUTER JOIN Stvcoll l
+ON(l.stvcoll_code = r.sovlcur_coll_code)
+LEFT OUTER JOIN stvdegc d
+ON(d.stvdegc_code = r.sovlcur_degc_code)
+LEFT OUTER JOIN stvdept de
+ON(de.stvdept_code = f.sovlfos_dept_code)
+LEFT OUTER JOIN stvmajr mj
+ON(mj.stvmajr_code = f.sovlfos_majr_code)
+WHERE r.sovlcur_pidm = #[flowVars.pidm]
+AND r.sovlcur_current_ind = 'Y'
+AND r.sovlcur_active_ind = 'Y'
+AND r.sovlcur_lmod_code= 'LEARNER'
+order by r.sovlcur_priority_no, r.sovlcur_curr_rule desc, lfstCodeSort]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="stuCurriculum" value="#[payload]" mimeType="application/json" doc:name="setStuCurriculum"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var payloadBkup=flowVars.stuCurriculum
+%var main= flowVars.mainPayload[0]
+---
+
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"curriculums" :
+
+(
+	payload distinctBy $.SOVLCUR_CURR_RULE map using (varCurrRule=$.SOVLCUR_CURR_RULE) {
+		college: $.STVCOLL_DESC,
+		collegeCode: $.SOVLCUR_COLL_CODE,
+		degree: $.STVDEGC_DESC,
+		degreeCode: $.SOVLCUR_DEGC_CODE,
+		fieldOfStudy: {
+			majors: payload filter $.SOVLFOS_LFST_CODE == 'MAJOR' and $.SOVLCUR_CURR_RULE == varCurrRule map using (varMajrCode=$.SOVLFOS_MAJR_CODE) {
+				dept: $.STVDEPT_DESC,
+				deptCode: $.SOVLFOS_DEPT_CODE,
+				code: $.SOVLFOS_MAJR_CODE,
+				description: $.STVMAJR_DESC,
+				concentrations: payload filter $.SOVLFOS_LFST_CODE == 'CONCENTRATION' and $.SOVLCUR_CURR_RULE == varCurrRule and $.SOVLFOS_CONC_ATTACH_MAJR_CODE == varMajrCode map {
+					dept: $.STVDEPT_DESC,
+				    deptCode: $.SOVLFOS_DEPT_CODE,
+					code: $.SOVLFOS_MAJR_CODE,
+					description: $.STVMAJR_DESC
+				}
+			},
+			minors: payload filter $.SOVLFOS_LFST_CODE == 'MINOR' and $.SOVLCUR_CURR_RULE == varCurrRule map {
+				dept: $.STVDEPT_DESC,
+				deptCode: $.SOVLFOS_DEPT_CODE,
+				code: $.SOVLFOS_MAJR_CODE,
+				description: $.STVMAJR_DESC
+			}
+		}
+	}
+)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentCurriculum&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    
+    <flow name="getStudentOutcomeFlow">
+        <set-variable variableName="flowName" value="getStudentOutcomeFlow" doc:name="Set flowName to getStudentOutcomeFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Check that a PIDM has been returned">
+            <when expression="#[payload != empty]">
+                <set-variable variableName="personPayload" value="#[payload]" mimeType="application/java" doc:name="setPersonPayload"/>
+                <message-properties-transformer scope="invocation" doc:name="Set Message Properties for getCurrilcumsFlow">
+                    <add-message-property key="pidm" value="#[flowVars.personPayload[0].pidm]"/>
+                    <add-message-property key="curriculumMode" value="OUTCOME"/>
+                </message-properties-transformer>
+                <flow-ref name="getCurriculumsFlow" doc:name="Get OUTCOME curriculum"/>
+                <dw:transform-message doc:name="Transform payload and set degree st">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+
+{
+  responseCode: 0,
+  responseMessage: "Data retrieved successfully",
+  data: payload distinctBy $.SOVLCUR_CURR_RULE map using (varCurrRule=$.SOVLCUR_CURR_RULE) {
+		curriculumTerm: $.SOVLCUR_TERM_CODE,
+		college: $.STVCOLL_DESC,
+		collegeCode: $.SOVLCUR_COLL_CODE,
+		degree: $.STVDEGC_DESC,
+		degreeCode: $.SOVLCUR_DEGC_CODE,
+		degreeDetails: (lookup("getDegreesByStudentOutcomeRecordTermFlow",{pidm:flowVars.pidm, curriculumTerm:$.SOVLCUR_TERM_CODE, degree:$.SOVLCUR_DEGC_CODE}).degrees),
+		fieldOfStudy: {
+			majors: payload filter $.SOVLFOS_LFST_CODE == 'MAJOR' and $.SOVLCUR_CURR_RULE == varCurrRule map using (varMajrCode=$.SOVLFOS_MAJR_CODE) {
+				dept: $.STVDEPT_DESC,
+				deptCode: $.SOVLFOS_DEPT_CODE,
+				code: $.SOVLFOS_MAJR_CODE,
+				description: $.STVMAJR_DESC,
+				concentrations: payload filter $.SOVLFOS_LFST_CODE == 'CONCENTRATION' and $.SOVLCUR_CURR_RULE == varCurrRule and $.SOVLFOS_CONC_ATTACH_MAJR_CODE == varMajrCode map {
+					dept: $.STVDEPT_DESC,
+				    deptCode: $.SOVLFOS_DEPT_CODE,
+					code: $.SOVLFOS_MAJR_CODE,
+					description: $.STVMAJR_DESC
+				}
+			},
+			minors: payload filter $.SOVLFOS_LFST_CODE == 'MINOR' and $.SOVLCUR_CURR_RULE == varCurrRule map {
+				dept: $.STVDEPT_DESC,
+				deptCode: $.SOVLFOS_DEPT_CODE,
+				code: $.SOVLFOS_MAJR_CODE,
+				description: $.STVMAJR_DESC
+			}
+		}
+	},
+  errors:[]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform payload and capture the person doesnt exist">
+                    <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": -1,
+	"responseMessage": "Data retrieved successfully",
+	"data": [],
+	"errors":[{
+		message: "Person not found."
+	}]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentCurriculum&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </flow>
+
+</mule>

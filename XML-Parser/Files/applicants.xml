@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:core-utils="http://www.mulesoft.org/schema/mule/core-utils"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core-utils http://www.mulesoft.org/schema/mule/core-utils/current/mule-core-utils.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="getApplicantsFlow">
+    <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows == empty?'10':message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow == empty ?'1':message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="startDate" value="#[message.inboundProperties.'http.query.params'.startDate]"/>
+            <add-message-property key="endDate" value="#[message.inboundProperties.'http.query.params'.endDate]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="GetAll Applicants">
+            <db:parameterized-query><![CDATA[select * from 
+(
+WITH popsel as 
+(select  pop.* FROM baninst1.DYN_APPS_POPSEL_MV pop)
+select 
+row_number() over( order by activity_date desc) rowNums
+,count(*) over() as total_records
+,popsel.* 
+from popsel
+WHERE activity_date>CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.startDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+    AND 
+    activity_date<=CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.endDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+     )a
+where rowNums >= #[flowVars.initRow] and 
+rowNums <= (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTAL_RECORDS,
+	"data": payload map ((student) -> {
+		"usfId" : student.USFID,
+		"name" : student.NAME,
+		"ApplicationNumber" : student.APPNO,
+		"ApplicationTerm" : student.TERM,
+		"studentType" : student.STUDENTTYPE,
+		"levelCode" : student.LEVl,
+		"levelDesc" : student.LEVELDESC,
+		"admitType" : student.ADMTCODE,
+		"studentStatus" : student.STUDENTSTATUS,
+		"leadStatus" : student.LEADSTATUS,
+		"netId" : null,
+		"applicationDate" : student.APPLICATIONDATE,
+		"admitDate" : student.ADMITDATE,
+		"decisionDate" : student.DECISIONDATE,
+		"decisionDetails" : student.DECISSIONDETAILS2,
+		"orsn" : student.ORSN,
+		"classification" : student.CLASSIFICATION,
+		"registered" : student.REGISTERED,
+		"degreeCode" : student.DEGREECODE,
+		"degreeDesc" : student.DEGREEDESC,
+		"applicationMajorCode" : student.MAJOR1,
+		"applicationMajorDEsc" : student.MAJOR,
+		"concentrationCode" : student.concCode,
+		"concentrationDesc" : student.concDesc,
+		"college" : student.COLLEGECODE,
+		"collegeDesc" : student.COLLEGE,
+		"calcCollegeDesc": student.CALCCOLLEGEDESC,
+		"department" : null,
+		"residencyCode" : student.RESIDENCYCODE,
+		"residencyDesc" : student.RESIDENCYDESC,
+		"firstGen" : student.FIRSTGEN,
+		"famIncLevel" : student.FAMINCLEVL,
+		"singleParent" : student.SINGLEPARENT,
+		"startTerm" : student.STARTTERM,
+		"collegeEarnedHours" : student.COLLEGEEARNEDHOURS,
+		"collegeGpa" : student.COLLEGEGPA,
+		"asf" : student.ASF,
+		"orcode" : student.ORCODE,
+		"ordesc" : student.ORDESC,
+		"descnCode" : student.DECSNCODE,
+		"descnDesc" : student.DECNDESC,
+		"apstCode" : student.APSTCODE,
+		"apstDesc" : student.APSTDESC,
+		"cntyCode" : student.CNTYCODE,
+		"cntyDesc" : student.CNTYDESC,
+		"confirmationNo" :student.CONFIRMATIONNO,
+		"activityDate" :student.ACTIVITY_DATE
+		}),
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+
+    <flow name="getApplicantsAttributesFlow">
+    
+    <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows == empty?'10':message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow == empty ?'1':message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="startDate" value="#[message.inboundProperties.'http.query.params'.startDate]"/>
+            <add-message-property key="endDate" value="#[message.inboundProperties.'http.query.params'.endDate]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Applicant Attributes">
+            <db:parameterized-query><![CDATA[SELECT * FROM 
+(
+WITH 
+dynRules AS 
+(SELECT erul.*
+      ,sdax.gtvsdax_external_code
+  FROM gtvsdax sdax
+      ,sarerul erul
+ WHERE sdax.gtvsdax_internal_code_group = 'TLSM'
+   AND sdax.gtvsdax_internal_code = 'SAAERUL'
+   AND erul.sarerul_egrp_code = 'TLSM'
+   AND sdax.gtvsdax_external_code = 'ATTRIBUTE'
+   AND substr(erul.sarerul_function
+             ,1
+             ,length(sdax.gtvsdax_translation_code)) =
+       sdax.gtvsdax_translation_code),
+Popsel AS 
+(SELECT DISTINCT 
+   USFID
+   ,name
+   ,saraatt_term_code STARTTERM
+   ,saraatt_appl_no APPNO
+   ,sarerul_desc ATTRIBUTECODE
+   ,sarerul_value ATTRIBUTEDESC
+   ,greatest(activity_date,NVL(b.saraatt_activity_date,activity_date)) activity_date
+  FROM baninst1.dyn_apps_popsel_mv     a
+  INNER JOIN saraatt b ON 
+  (b.saraatt_pidm = a.pidm
+   AND saraatt_appl_no = appno
+   AND b.saraatt_term_code >=sys_context('eai_context', 'term_start'))
+  INNER JOIN dynRules ON 
+  (sarerul_desc = b.saraatt_atts_code) order by 1)
+ select 
+row_number() over( order by activity_date desc) rowNums
+,count(*) over() as total_records
+,popsel.* 
+from popsel
+WHERE activity_date>CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.startDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+    AND 
+    activity_date<=CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.endDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+     )a
+where rowNums >= #[flowVars.initRow] and 
+rowNums <= (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTAL_RECORDS,
+	"data": payload map ((student) -> {
+		"usfId" : student.USFID,
+		"name" : student.NAME,
+		"applicationNumber": student.APPNO,
+		"startTerm": student.STARTTERM,
+        "attribute": student.ATTRIBUTEDESC,
+        "attributeCode": student.ATTRIBUTECODE,
+		"activityDate" :student.ACTIVITY_DATE
+		}),
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+      
+  
+    <flow name="getApplicantsChecklistFlow">
+    <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows == empty?'10':message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow == empty ?'1':message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="startDate" value="#[message.inboundProperties.'http.query.params'.startDate]"/>
+            <add-message-property key="endDate" value="#[message.inboundProperties.'http.query.params'.endDate]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="GetAll ApplicantsChecklist">
+            <db:parameterized-query><![CDATA[select * from 
+(WITH 
+dynRules AS 
+(SELECT erul.*
+      ,sdax.gtvsdax_external_code
+  FROM gtvsdax sdax
+      ,sarerul erul
+ WHERE sdax.gtvsdax_internal_code_group = 'TLSM'
+   AND sdax.gtvsdax_internal_code = 'SAAERUL'
+   AND erul.sarerul_egrp_code = 'TLSM'
+   AND gtvsdax_external_code = 'ADMRINTL'
+   AND substr(erul.sarerul_function
+             ,1
+             ,length(sdax.gtvsdax_translation_code)) =
+       sdax.gtvsdax_translation_code),
+saacTestScores As 
+(SELECT sortest_pidm saacPidm,MAX(a.sortest_test_date) saacTestDate
+        FROM sortest a
+       WHERE a.sortest_tesc_code IN ('STI1', 'EAC5')
+         AND a.sortest_test_date IS NOT NULL
+         group by sortest_pidm ),
+toeflTestScores AS
+(SELECT sortest_pidm toeflPidm,MAX(a.sortest_test_date) toeflTestDate
+        FROM sortest a
+       WHERE a.sortest_tesc_code IN
+             ('ILTO', 'TFIT', 'PTEL', 'PTER', 'PTES', 'PTEW')
+         AND a.sortest_test_date IS NOT NULL
+          group by sortest_pidm),
+hsDate as
+(SELECT sorhsch_pidm,sorhsch_sbgi_code, max(sorhsch_trans_recv_date) hsDate
+        FROM sorhsch a
+   group by sorhsch_pidm,sorhsch_sbgi_code),
+collDate AS 
+(SELECT sorpcol_pidm,sorpcol_sbgi_code, max(sorpcol_trans_rev_date) collDate
+         FROM sorpcol a
+       WHERE a.sorpcol_sbgi_code <> 'EXAMCR'
+         AND a.sorpcol_official_trans = 'Y'
+   group by sorpcol_pidm,sorpcol_sbgi_code),
+popsel AS 
+(SELECT      pop.usfId
+            ,pop.name
+            ,pop.term
+            ,pop.appno
+            ,sarchkl_admr_code admrcode
+            ,nvl(sarerul_value, stvadmr_desc) admrdesc
+            ,sarchkl_code_value item
+            ,sarchkl_comment itemdesc
+            ,saacTestDate
+            ,toeflTestDate
+            ,hsDate
+            ,collDate
+            ,sarchkl_receive_date 
+            ,CASE 
+                WHEN sarchkl_receive_date IS NULL AND sarchkl_admr_code = 'SAAC'THEN saacTestDate
+                WHEN sarchkl_receive_date IS NULL AND sarchkl_admr_code = 'TOFL'THEN toeflTestDate
+                WHEN sarchkl_receive_date IS NULL AND sarchkl_admr_code IN ('HSTP', 'HREC') THEN hsDate
+                WHEN sarchkl_receive_date IS NULL AND sarchkl_admr_code LIKE 'CTR%'THEN collDate
+                ELSE sarchkl_receive_date
+                END recvdate
+            ,CASE
+               WHEN nvl(sarchkl_mandatory_ind, 'N') = 'Y' THEN
+                'Yes'
+               ELSE
+                'No'
+             END mandatoryind
+            ,greatest(NVL(saacTestDate,'01-JAN-11')
+                    ,NVL(toeflTestDate,'01-JAN-11')
+                    ,NVL(hsDate,'01-JAN-11')
+                    ,NVL(collDate,'01-JAN-11')
+                    ,NVL(sarchkl_activity_date,'01-JAN-11')
+                    ,NVL(activity_date,'01-JAN-11')) activity_date
+        FROM baninst1.DYN_APPS_POPSEL_MV pop
+        INNER JOIN sarchkl b ON 
+        (sarchkl_pidm = pop.pidm AND 
+         sarchkl_term_code_entry = pop.term AND 
+         sarchkl_appl_no = pop.appno)
+        INNER JOIN stvadmr   ON
+        (stvadmr_code = sarchkl_admr_code)
+        LEFT OUTER JOIN dynRules ON    
+        (sarerul_desc = sarchkl_admr_code)
+        Left outer JOIN saacTestScores ON
+        (saacPidm = pop.pidm)
+        Left outer JOIN toeflTestScores ON
+        (toeflPidm = pop.pidm)
+        LEFT OUTER JOIN hsDate ON 
+        (sorhsch_pidm = pop.pidm AND 
+        sorhsch_sbgi_code = sarchkl_code_value)
+        LEFT OUTER JOIN collDate ON 
+        (sorpcol_pidm = pop.pidm AND 
+        sorpcol_sbgi_code = sarchkl_code_value))
+Select   row_number() over( order by activity_date desc) rowNums
+            ,count(*) over() as total_records
+            ,popsel.*
+             from POPSEL
+WHERE activity_date> CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.startDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+    AND 
+    activity_date<= CAST(
+  FROM_TZ(TO_TIMESTAMP(#[flowVars.endDate],'FXYYYY-MM-DD"T"HH24:MI:SS'),
+    'UTC') AT LOCAL AS DATE)
+     )a
+where rowNums >= #[flowVars.initRow] and 
+rowNums <= (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTAL_RECORDS,
+	"data": payload map ((student) -> {
+		"usfId" : student.USFID,
+		"name" : student.NAME,
+		"term": student.TERM,
+		"applicationNumber" : student.APPNO,
+		"admissionRequest" : student.ADMRCODE,
+		"description" : student.ADMRDESC,
+		"receivedDate" : student.RECVDATE,
+		"item" : student.ITEM,
+		"itemDescription" : student.ITEMDESC,
+		"mandatoryIndicator" : student.MANDATORYIND,
+		"activityDate" :student.ACTIVITY_DATE
+		}),
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+
+</mule>

@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+    <flow name="getAddressFlow">
+      <set-variable variableName="flowName" value="getAddressFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get address info">
+            <db:parameterized-query><![CDATA[select ad.SPRTELE_PHONE_AREA||'-'||ad.SPRTELE_PHONE_NUMBER phone
+from awg_address_reporting_pm_ml ad
+where ad.SPRADDR_ATYP_CODE = 'PM'
+and ad.spraddr_pidm = #[flowVars.pidm]]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getAddressFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getAddressesFlow">
+      <set-variable variableName="flowName" value="getAddressesFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Check that a PIDM has been returned">
+            <when expression="#[payload != empty]">
+                <set-variable variableName="sisPidm" value="#[payload[0].pidm]" doc:name="Set SIS Internal Identifier (PIDM)"/>
+                <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get All addresses">
+                    <db:parameterized-query><![CDATA[SELECT SPRADDR_PIDM ,
+    SPRADDR_ATYP_CODE ,
+    SPRADDR_SEQNO ,
+    SPRADDR_FROM_DATE ,
+    SPRADDR_TO_DATE ,
+    SPRADDR_STREET_LINE1 ,
+    SPRADDR_STREET_LINE2 ,
+    SPRADDR_STREET_LINE3 ,
+    SPRADDR_CITY ,
+    SPRADDR_STAT_CODE ,
+    SPRADDR_ZIP ,
+    SPRADDR_CNTY_CODE ,
+    SPRADDR_NATN_CODE ,
+    STVNATN_NATION SPRADDR_NATN_DESC ,
+    SPRTELE_PHONE_AREA ,
+    SPRTELE_PHONE_NUMBER ,
+    SPRTELE_PHONE_EXT
+  FROM SPRADDR A
+  left outer join (select * from SPRTELE T
+  where T.SPRTELE_PRIMARY_IND = 'Y'
+  AND T.SPRTELE_STATUS_IND IS NULL
+  AND ( T.SPRTELE_SEQNO         =
+    (SELECT MAX(TT.SPRTELE_SEQNO)
+    FROM SPRTELE TT
+    WHERE TT.SPRTELE_PIDM      = T.SPRTELE_PIDM
+    AND TT.SPRTELE_ATYP_CODE   = T.SPRTELE_ATYP_CODE
+    AND TT.SPRTELE_ADDR_SEQNO  = T.SPRTELE_ADDR_SEQNO
+    AND TT.SPRTELE_PRIMARY_IND = T.SPRTELE_PRIMARY_IND
+    )
+  OR SPRTELE_SEQNO  IS NULL )) t2 on
+  t2.sprtele_pidm = A.SPRADDR_PIDM
+  and t2.sprtele_addr_seqno = a.SPRADDR_SEQNO
+  and t2.SPRTELE_ATYP_CODE = A.SPRADDR_ATYP_CODE
+  inner join STVNATN N
+  on N.STVNATN_CODE = NVL(A.SPRADDR_NATN_CODE,'US')
+  WHERE A.SPRADDR_PIDM = #[flowVars.sisPidm]
+ and A.SPRADDR_SEQNO =
+    (SELECT MAX(AB.SPRADDR_SEQNO)
+    FROM SPRADDR AB
+    WHERE AB.SPRADDR_PIDM    = A.SPRADDR_PIDM
+    AND AB.SPRADDR_ATYP_CODE = A.SPRADDR_ATYP_CODE
+    AND SYSDATE BETWEEN NVL(AB.SPRADDR_FROM_DATE,SYSDATE-1) AND NVL(AB.SPRADDR_TO_DATE,SYSDATE+1)
+    AND AB.SPRADDR_STATUS_IND IS NULL
+    )
+  AND SYSDATE BETWEEN NVL(A.SPRADDR_FROM_DATE,SYSDATE-1) AND NVL(A.SPRADDR_TO_DATE,SYSDATE+1)
+  AND A.SPRADDR_STATUS_IND IS NULL]]></db:parameterized-query>
+                </db:select>
+                <dw:transform-message doc:name="Transform Message to JSON">
+                    <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": payload map ((addr , indexOfAddr) -> {
+		"uNumber": flowVars.uNumber,
+		"addressType": addr.SPRADDR_ATYP_CODE,
+		"fromDate": addr.SPRADDR_FROM_DATE,
+		"toDate": addr.SPRADDR_TO_DATE,
+		"streetLine1": addr.SPRADDR_STREET_LINE1,
+		"streetLine2": addr.SPRADDR_STREET_LINE2,
+		"streetLine3": addr.SPRADDR_STREET_LINE3,
+		"city": addr.SPRADDR_CITY,
+		"state": addr.SPRADDR_STAT_CODE,
+		"zip": addr.SPRADDR_ZIP,
+		"countyCode": addr.SPRADDR_CNTY_CODE,
+		"nationCode": addr.SPRADDR_NATN_CODE,
+		"nationDesc": addr.SPRADDR_NATN_DESC,
+		"phoneArea": addr.SPRTELE_PHONE_AREA,
+		"phoneNumber": addr.SPRTELE_PHONE_NUMBER,
+		"phoneExt": addr.SPRTELE_PHONE_EXT
+			}),
+	"errors":[]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": -1,
+	"responseMessage": "Data retrieved successfully",
+	"data": [],
+	"errors":[{
+		message: "Student not found."
+	}]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getAddressFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getResFlow">
+      <set-variable variableName="flowName" value="getResFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="get residence hall">
+            <db:parameterized-query><![CDATA[SELECT NVL(r.spraddr_street_line3,'OFF-CAMPUS') hall
+FROM spraddr r
+where r.spraddr_atyp_code ='MP'
+  and r.spraddr_pidm = #[flowVars.pidm]
+  AND r.spraddr_seqno = (select max(rr.spraddr_seqno) FROM spraddr rr
+                          WHERE r.spraddr_pidm =rr.spraddr_pidm
+                            AND r.spraddr_atyp_code = rr.spraddr_atyp_code)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getAddressesFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

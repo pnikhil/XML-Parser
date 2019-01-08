@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="getHoldsPidmFlow">
+      <set-variable variableName="flowName" value="getHoldsPidmFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="pidm"/>
+        <flow-ref name="getStudentHoldsFlow" doc:name="getStudentHoldsFlow"/>
+    </flow>
+    <flow name="getStudentHoldsFlow">
+      <set-variable variableName="flowName" value="getStudentHoldsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get FunctionCodes">
+            <db:parameterized-query><![CDATA[select distinct(f.swzfnct_code) functionCode , f.swzfnct_desc  functionDesc  from swzfnct f,swrfcpc c
+      where f.swzfnct_code=c.swrfcpc_fnct_code]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="allHolds" value="#[[]]" doc:name="All Holds"/>
+        <foreach doc:name="For Each">
+            <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Holds">
+                <db:parameterized-query><![CDATA[select   h.swzhldd_code holdCode,h.swzhldd_desc holdDesc ,#[payload.FUNCTIONCODE] holdFuncCode,#[payload.FUNCTIONDESC] holdFuncDesc from  swzhldd h
+where ' ' || baninst1.wsakhldr.wf_get_hold_info_concat_db(#[flowVars.pidm],#[flowVars.currentTerm],#[payload.FUNCTIONCODE]) like '% ' || h.swzhldd_code || ' %']]></db:parameterized-query>
+            </db:select>
+            <expression-transformer expression="#[payload != empty?flowVars.allHolds.addAll(payload):'']" doc:name="Save AllHolds"/>
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var main= flowVars.mainPayload[0]
+---
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"holds": flowVars.allHolds map ((holds , indexOfholds) -> {
+
+		"holdCode" : holds.holdCode,
+		"holdDesc" : holds.holdDesc,
+		"holdFuncCode" : holds.holdFuncCode,
+		"holdFunctionDesc" : holds.holdFuncDesc
+
+	})
+
+	}
+
+
+ ]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentHoldsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getSingleStudentHoldsFlow">
+      <set-variable variableName="flowName" value="getSingleStudentHoldsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:delete config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="Delete Session">
+            <db:parameterized-query><![CDATA[DELETE FROM swahdsn where swahdsn_sessionid = userenv('sessionid')]]></db:parameterized-query>
+        </db:delete>
+        <db:insert config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="Insert into swahdsn">
+            <db:parameterized-query><![CDATA[INSERT INTO swahdsn  (swahdsn_sessionid,
+			                      swahdsn_username,
+                       			swahdsn_pidm,
+                      			swahdsn_reg_term,
+                       			swahdsn_process,
+                            swahdsn_transaction)
+                     VALUES(userenv('sessionid'), USER, #[flowVars.pidm], #[flowVars.currentTerm], 'MULESOFT', -1)]]></db:parameterized-query>
+        </db:insert>
+        <db:select config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="Get All Holds">
+            <db:parameterized-query><![CDATA[SELECT distinct d.swvvrhd_hldd_code holdCode,d.swvvrhd_desc holdDesc,d.swvvrhd_fnct_code holdFuncCode,d.swvvrhd_fnct_desc holdFuncDesc
+     FROM baninst1.swvvrhd d
+    WHERE swvvrhd_override_ind = 'N'
+      AND swvvrhd_bypass_ind = 'N']]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="allHolds" value="#[payload]" doc:name="allHolds"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var main= flowVars.mainPayload[0]
+---
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"holds": flowVars.allHolds map ((holds , indexOfholds) -> {
+
+		"holdCode" : holds.holdCode,
+		"holdDesc" : holds.holdDesc,
+		"holdFuncCode" : holds.holdFuncCode,
+		"holdFunctionDesc" : holds.holdFuncDesc
+
+	})
+
+	}
+
+
+ ]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getSingleStudentHoldsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

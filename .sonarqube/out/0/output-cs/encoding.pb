@@ -1,0 +1,15 @@
+D
+;C:\Projects\XML-Parser\XML-Parser\App_Start\BundleConfig.csutf-8D
+;C:\Projects\XML-Parser\XML-Parser\App_Start\FilterConfig.csutf-8C
+:C:\Projects\XML-Parser\XML-Parser\App_Start\RouteConfig.csutf-8N
+EC:\Projects\XML-Parser\XML-Parser\Controllers\FileUploadController.csutf-8H
+?C:\Projects\XML-Parser\XML-Parser\Controllers\HomeController.csutf-8H
+?C:\Projects\XML-Parser\XML-Parser\Controllers\ViewController.csutf-89
+0C:\Projects\XML-Parser\XML-Parser\Global.asax.csutf-8A
+8C:\Projects\XML-Parser\XML-Parser\Helpers\FilesHelper.csutf-8D
+;C:\Projects\XML-Parser\XML-Parser\Helpers\RegexValidator.csutf-8?
+6C:\Projects\XML-Parser\XML-Parser\Helpers\XmlHelper.csutf-8=
+4C:\Projects\XML-Parser\XML-Parser\Models\Document.csutf-8C
+:C:\Projects\XML-Parser\XML-Parser\Models\FilesViewModel.csutf-8A
+8C:\Projects\XML-Parser\XML-Parser\Models\XmlViewModel.csutf-8E
+<C:\Projects\XML-Parser\XML-Parser\Properties\AssemblyInfo.csutf-8

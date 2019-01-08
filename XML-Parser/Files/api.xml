@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:core-utils="http://www.mulesoft.org/schema/mule/core-utils"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/api-platform-gw http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+http://www.mulesoft.org/schema/mule/core-utils http://www.mulesoft.org/schema/mule/core-utils/current/mule-core-utils.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+ 
+    <flow name="api-main">
+        <http:listener config-ref="api-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
+        <set-variable variableName="projectName" value="sys-students" doc:name="Set flow variable for projectName" />
+        <set-variable variableName="logUUID" value="#[java.util.UUID.randomUUID()]" doc:name="Set flow variable for logUUID" />
+        <set-variable variableName="flowName" value="api-main" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;main flow triggered&quot;" 
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <apikit:router config-ref="api-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="api-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="api-console">
+        <http:listener config-ref="api-httpListenerConfig" path="/console/*" doc:name="HTTP"/>
+        <apikit:console config-ref="api-config" doc:name="APIkit Console"/>
+    </flow>
+    
+    <flow name="get:/contacts:api-config">
+        <flow-ref name="getContactsFlow" doc:name="getContactsFlow"/>
+    </flow>
+    
+       <flow name="get:/contacts/attributes:api-config">
+        <flow-ref name="getContactsAttributesFlow" doc:name="getContactsAttributesFlow"/>
+    </flow>
+
+      <flow name="get:/contacts/addresses:api-config">
+        <flow-ref name="getContactsAddressFlow" doc:name="getContactsAddressFlow"/>
+       </flow>
+
+        <flow name="get:/contacts/scholarShips:api-config">
+        <flow-ref name="getContactsScholarShipsFlow" doc:name="getContactsScholarShipsFlow"/>
+        </flow>
+
+    <flow name="get:/contacts/previousCollege:api-config">
+        <flow-ref name="getContactsPrevEdFlow" doc:name="getContactsPrevEdFlow"/>
+      </flow>
+
+        <flow name="get:/contacts/testScores:api-config">
+        <flow-ref name="getContactsTestScoresFlow" doc:name="getContactsTestScoresFlow"/>
+    </flow>
+
+    <flow name="get:/contacts/highSchool:api-config">
+        <flow-ref name="getContactsHighSchoolFlow" doc:name="getContactsHighSchoolFlow"/>
+    </flow>    
+
+
+    <flow name="get:/applicants:api-config">
+        <flow-ref name="getApplicantsFlow" doc:name="getApplicantsFlow"/>
+    </flow>
+
+     <flow name="get:/applicants/checklists:api-config">
+        <flow-ref name="getApplicantsChecklistFlow" doc:name="getApplicantsChecklistFlow"/>
+    </flow>
+    
+    <flow name="get:/applicants/attributes:api-config">
+        <flow-ref name="getApplicantsAttributesFlow" doc:name="getApplicantsAttributesFlow"/>
+
+    </flow>
+    <flow name="post:/persons:api-config">
+        <flow-ref name="createPersonRecordFlow" doc:name="createPersonRecordFlow"/>
+    </flow>
+    <flow name="get:/applicants/{studentId}:api-config">
+        <flow-ref name="getApplicantsApplicationsFlow" doc:name="getApplicantsApplicaionsFlow"/>
+    </flow>
+    <flow name="delete:/applicants/{studentId}/admissionComments:api-config">
+        <flow-ref name="admissionsCommentsDeleteFlow" doc:name="admissionsCommentsDeleteFlow"/>
+    </flow>
+    <flow name="post:/applicants/{studentId}/admissionDecisions:api-config">
+        <flow-ref name="postDecisionsJSONOutputFlow" doc:name="postDecisionsJSONOutputFlow"/>
+	</flow>
+    <flow name="get:/applicants/{studentId}/checklists:api-config">
+        <flow-ref name="getChecklistsByApplicantFlow" doc:name="getChecklistsByApplicantFlow"/>
+    </flow>
+    <flow name="get:/applicants/{studentId}/curriculums:api-config">
+        <set-variable variableName="curriculumModule" value="ADMISSIONS" doc:name="Set curriculum Module to ADMISSIONS"/>
+        <flow-ref name="getCurriculumsFlow" doc:name="getCurriculumsFlow"/>
+    </flow>
+    <flow name="post:/applicants/{studentId}/curriculums/concentrations:api-config">
+        <set-variable variableName="curriculumModule" value="ADMISSIONS" doc:name="Set curriculum Module to ADMISSIONS"/>
+        <flow-ref name="postConcentrationsFlow" doc:name="postConcentrationsFlow"/>
+    </flow>
+    <flow name="delete:/applicants/{studentId}/curriculums/concentrations:api-config">
+        <set-variable variableName="curriculumModule" value="ADMISSIONS" doc:name="Set curriculum Module to ADMISSIONS"/>
+        <flow-ref name="deleteConcentrationsFlow" doc:name="deleteConcentrationsFlow"/>
+    </flow>
+    <flow name="get:/applicants/{studentId}/priorInstitutions:api-config">
+        <flow-ref name="getPriorinstitutionsJSONFlow" doc:name="getPriorinstitutionsJSONFlow"/>
+    </flow>
+      <flow name="get:/applicants/{studentId}/testScores:api-config">
+        <flow-ref name="getTestScoresFlow" doc:name="getTestScoresFlow"/>
+    </flow>
+    <flow name="get:/persons/{studentId}:api-config">
+        <flow-ref name="getPersonsJSONOutputFlow" doc:name="getPersonsJSONOutputFlow"/>
+    </flow>
+    <flow name="get:/searchStudents:api-config">
+        <flow-ref name="getSearchStudentsFlow" doc:name="getSearchStudentsFlow"/>
+    </flow>
+    <flow name="get:/students:api-config">
+        <flow-ref name="getStudentsFlow" doc:name="getStudentsFlow"/>
+
+    </flow>
+    <flow name="get:/students/{studentId}:api-config">
+        <flow-ref name="getStudentInfoFlow" doc:name="getStudentInfoFlow"/>
+
+    </flow>
+    <flow name="get:/students/{studentId}/addresses:api-config">
+        <flow-ref name="getAddressesFlow" doc:name="getAddressesFlow"/>
+    </flow>
+    <flow name="get:/students/{studentId}/gpaHours:api-config">
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+    <flow-ref name="getAllHoursAndGpaFlow" doc:name="getAllHoursAndGpaFlow"/>
+
+    </flow>
+    <flow name="get:/students/{studentId}/holds:api-config">
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+    <flow-ref name="getSingleStudentHoldsFlow" doc:name="getSingleStudentHoldsFlow"/>
+
+    </flow>
+    <flow name="get:/students/{studentId}/curriculums:api-config">
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+    <flow-ref name="getStudentCurriculum" doc:name="getStudentCurriculum"/>
+
+    </flow>
+    <flow name="get:/students/{studentId}/registrations:api-config">
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+    <flow-ref name="getRegistrationFlow" doc:name="getRegistrationFlow"/>
+
+    </flow>    
+    <flow name="get:/students/{studentId}/cohorts:api-config">
+        <flow-ref name="getStudentLearnerRecordFlow" doc:name="getStudentLearnerRecordFlow"/>
+    <flow-ref name="getCohortFlow" doc:name="getCohortFlow"/>
+
+    </flow>     
+    <flow name="get:/advisors:api-config">
+        <flow-ref name="getAllStudentAdvisorsRelationsFlow" doc:name="getAllStudentAdvisorsRelationsFlow"/>
+
+    </flow>
+    <flow name="get:/advisors/studentTrackingFlags/{studentId}:api-config">
+        <flow-ref name="getAdvisorsStudentTrackingResourceFlow" doc:name="getAdvisorsStudentTrackingResourceFlow"/>
+    </flow>
+    <flow name="post:/advisors/studentTrackingFlags/{studentId}:api-config">
+        <flow-ref name="postAdvisorsStudentTrackingResourceFlow" doc:name="postAdvisorsStudentTrackingResourceFlow"/>
+    </flow>
+           <flow name="post:/advisors:api-config">
+        <flow-ref name="postAdvisorsFlow" doc:name="postAdvisorsFlow"/>
+
+    </flow>
+     <flow name="get:/advisors/unMappedRules:api-config">
+        <flow-ref name="getUnmappedStudentsAdvisorsFlow" doc:name="getUnmappedStudentsAdvisorsFlow"/>
+    </flow>
+    <flow name="get:/advisors/{advisorId}:api-config">
+        <flow-ref name="getStudentsPerAdvisorFlow" doc:name="getStudentsPerAdvisorFlow"/>
+    </flow>
+    <flow name="get:/advisors/{advisorId}/students:api-config">
+        <flow-ref name="getStudentsPerAdvisorFlow" doc:name="getStudentsPerAdvisorFlow"/>
+    </flow>
+    <flow name="get:/courseSections:api-config">
+        <flow-ref name="getCourseSectionsFlow" doc:name="getCourseSectionsFlow"/>
+    </flow>
+    <flow name="get:/courseSections/{courseRefNumber}:api-config">
+        <flow-ref name="getCourseSectionFlow" doc:name="getCourseSectionFlow"/>
+    </flow>
+    <flow name="get:/courseSections/{courseRefNumber}/instructors:api-config">
+        <flow-ref name="getInstructorsFlow" doc:name="getInstructorsFlow"/>
+    </flow>
+    <flow name="get:/courseSections/{courseRefNumber}/registrations:api-config">
+        <flow-ref name="getRegistrationsFlow" doc:name="getRegistrationsFlow"/>
+    </flow>
+    <flow name="get:/instructors/{usfId}/courseAssignments:api-config">
+        <flow-ref name="getInstructorsCourseAssignmentsFlow" doc:name="getInstructorsCourseAssignmentsFlow"/>
+    </flow>
+    <flow name="get:/instructors/{usfId}/courseEvaluations:api-config">
+        <flow-ref name="getCourseEvaluationsFlow" doc:name="getCourseEvaluationsFlow"/>
+    </flow>
+    <flow name="get:/instructors/{usfId}/courseEvaluations/comments:api-config">
+        <flow-ref name="getCourseEvaluationsCommentsFlow" doc:name="getCourseEvaluationsCommentsFlow"/>
+    </flow>
+    <flow name="get:/outcomes/{studentId}:api-config">
+        <flow-ref name="getStudentOutcomeFlow" doc:name="get student outcome"/>
+    </flow>    
+  
+  <flow name="coreUtilsLogAndNotifyFlow">
+        <async doc:name="Async">
+            <core-utils:log config-ref="CoreUtils__Configuration" doc:name="Call CoreUtils Log">
+                <core-utils:log-entry application="${app.application.name}" environment="${mule.env}" apiName="${api.name}" apiVersion="${api.version}" date="#[server.dateTime]" clientId="#[message.inboundProperties.client_id]" level="ERROR" message="#['Error:' + flowVars.exception ]"/>
+            </core-utils:log>
+        </async>
+        <async doc:name="Async">
+            <core-utils:notify config-ref="CoreUtils__Configuration" doc:name="Call CoreUtils Notifications">
+                <core-utils:notification-entry application="${app.application.name}" environment="${mule.env}" apiName="${api.name}" apiVersion="${api.version}" date="#[server.dateTime]" clientId="#[message.inboundProperties.client_id]" level="ERROR" message="#['Error:' + flowVars.exception ]"/>
+            </core-utils:notify>
+        </async>
+    </flow>
+
+    <apikit:mapping-exception-strategy name="api-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+         <apikit:mapping statusCode="500">
+            <apikit:exception value="java.lang.Exception" />
+            <set-variable variableName="exception" value="#[exception]" doc:name="Store Exception"/>
+            <dw:transform-message doc:name="create exception details">
+                <dw:set-variable resource="classpath:dwScripts/createExceptionDetails.dwl" variableName="excDetails"/>
+
+            </dw:transform-message>
+            <dw:transform-message doc:name="Build Error Message">
+                <dw:set-payload resource="classpath:dwScripts/buildErrorMessage.dwl"/>
+
+            </dw:transform-message>
+            <flow-ref name="coreUtilsLogAndNotifyFlow" doc:name="coreUtilsLogAndNotifyFlow"/>
+ 
+
+        </apikit:mapping>
+        
+        
+    </apikit:mapping-exception-strategy>
+
+</mule>

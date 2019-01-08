@@ -1,0 +1,281 @@
+﻿@model XML_Parser.Models.XmlViewModel
+
+@{
+    ViewBag.Title = "Parsed XML Content";
+}
+
+<!-- blueimp File Upload & Gallery styles -->
+@Styles.Render("~/Content/jQuery-File-Upload")
+
+@if (Model.isEmptyParam)
+{
+    <h3>This file is not valid or does not exists.</h3>
+}
+else
+{
+    <h3>Parsed XML Content</h3>
+
+    <div class="row">
+        <div class="col-xs-6">
+            <h4>File name - @Model.name</h4>
+        </div>
+        <div class="col-xs-6">
+            <input type="button" value="Go Back" class="btn btn-danger pull-right" onclick="location.href='@Url.Action("Index", "FileUpload")'" />
+        </div>
+    </div>
+
+    <div class="row container" style="margin-top:20px;">
+        <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+            @{int i = 1;}
+            @foreach (var tag in Model.parsedXml.Tags)
+            {
+                <div class="panel panel-success">
+                    <div class="panel-heading active" role="tab" id="heading_@i">
+                        <h4 class="panel-title">
+                            <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapse_@i@i" aria-expanded="true" aria-controls="collapse_@i@i">
+
+                                @tag.tagName.Trim()
+                            </a>
+                        </h4>
+                    </div>
+                    <div id="collapse_@i@i" class="panel-collapse collapse @(i == 1 ? "in" : "")" role="tabpanel" ifia-labelledby="heading_@i">
+                        <div class="panel-body">
+                            @if (tag.attributeKeyValue.Count == 0)
+                            {
+                                <p>Nothing to Display</p>
+                            }
+                            else
+                            {
+
+                                foreach (var attributePair in tag.attributeKeyValue)
+                                {
+                                    <div style="margin-top: 5px;"><strong>@attributePair.Key =></strong> @attributePair.Value @*<span class="label label-info label-sm" onclick="copyText('@attributePair.Value')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span>*@</div>
+
+                                }
+                            }
+
+                            @if (tag.hasChildTag)
+                            {
+
+                                int j = 1;
+                                if (tag.childTagList.Count > 0)
+                                {
+                                    foreach (var childTag in tag.childTagList)
+                                    {
+
+                                        <div class="panel-group" style="margin-top:20px; width: 95%;" id="accordion_@i@i@j">
+
+                                            <div class="panel panel-info">
+                                                <div class="panel-heading">
+                                                    <h4 class="panel-title">
+                                                        <a data-toggle="collapse" data-parent="#accordion_@i@i@j" href="#collapse_@i@i@j">
+                                                            @childTag.childTagname
+                                                        </a>
+                                                    </h4>
+                                                </div>
+                                                <div id="collapse_@i@i@j" class="panel-collapse collapse in">
+                                                    @if (childTag.childAttributeKeyValue != null)
+                                                    {
+                                                        <div class="panel-body">
+                                                            @foreach (var childAttributePair in childTag.childAttributeKeyValue)
+                                                            {
+                                                                <div style="margin-top: 5px;">
+                                                                    <strong>@childAttributePair.Key =></strong> @childAttributePair.Value @*<span class="label label-info label-sm" onclick="copyText('@childAttributePair.Value')" style="cursor: pointer;   font-size: 10px; margin-left:10px;">Copy</span>*@
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    }
+
+                                                    @if (childTag.hasGrandchildTag)
+                                                    {
+
+                                                        int k = 1;
+                                                        if (childTag.grandchildTagList.Count > 0)
+                                                        {
+                                                            foreach (var grandchildTag in childTag.grandchildTagList)
+                                                            {
+
+                                                                <div class="panel-group" style="margin-top:10px; width: 95%; margin-left: 2%;" id="accordion_@i@i@j@k">
+
+                                                                    <div class="panel panel-info">
+                                                                        <div class="panel-heading">
+                                                                            <h4 class="panel-title">
+                                                                                <a data-toggle="collapse" data-parent="#accordion_@i@i@j@k" href="#collapse_@i@i@j@k">
+                                                                                    @grandchildTag.grandchildTagname
+                                                                                </a>
+                                                                            </h4>
+                                                                        </div>
+                                                                        <div id="collapse_@i@i@j@k" class="panel-collapse collapse in">
+                                                                            @if (grandchildTag.grandchildAttributeKeyValue != null)
+                                                                            {
+                                                                                <div class="panel-body">
+                                                                                    @foreach (var grandchildAttributePair in grandchildTag.grandchildAttributeKeyValue)
+                                                                                    {
+                                                                                        <div style="margin-top: 5px;">
+                                                                                            <strong>@grandchildAttributePair.Key =></strong> @grandchildAttributePair.Value @*<span class="label label-info label-sm" onclick="copyText('@grandchildAttributePair.Value')" style="cursor: pointer;   font-size: 10px; margin-left:10px;">Copy</span>*@
+                                                                                        </div>
+                                                                                    }
+                                                                                </div>
+                                                                            }
+
+
+
+                                                                        </div>
+                                                                    </div>
+
+                                                                </div>
+                                                                k++;
+                                                            }
+
+                                                        }
+
+                                                    }
+
+
+
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                        j++;
+                                    }
+
+                                }
+
+                            }
+                        </div>
+                    </div>
+                </div>
+                i++;
+            }
+        </div>
+
+    </div>
+    <div class="row container">
+
+
+        @if (Model.parsedXml.IsGlobal)
+        {
+            <h3>Available Resources</h3>
+
+            if (Model.parsedXml.GlobalResources.DbConfig.Count > 0)
+            {
+                int dbCount = 0;
+                foreach (var dbConfig in Model.parsedXml.GlobalResources.DbConfig)
+                {
+                    dbCount++;
+                    <div class="panel panel-warning">
+                        <div class="panel-heading config-area">Database Configuration @dbCount</div>
+                        <div class="panel-body">
+                            <p><strong>DB Name: </strong>@dbConfig.Dbname <span class="label label-info label-sm" onclick="copyText('@dbConfig.Dbname')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                            <p><strong>DB Type: </strong>@dbConfig.DbType <span class="label label-info label-sm" onclick="copyText('@dbConfig.DbType')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                            <p><strong>DB URL: </strong>@(string.IsNullOrEmpty(dbConfig.DbUrl) ? "Not Specified" : dbConfig.DbUrl) <span class="label label-info label-sm" onclick="copyText('@dbConfig.DbUrl')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                        </div>
+                    </div>
+                }
+
+                int wsCount = 0;
+                foreach (var wsConfig in Model.parsedXml.GlobalResources.WebServiceConfig)
+                {
+                    wsCount++;
+                    <div class="panel panel-warning">
+                        <div class="panel-heading config-area">Web Service Configuration @wsCount</div>
+                        <div class="panel-body">
+                            <p><strong>Webservice Name: </strong>@wsConfig.WsName <span class="label label-info label-sm" onclick="copyText('@wsConfig.WsName')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span> </p>
+                            <p><strong>WS Service: </strong>@wsConfig.WsService <span class="label label-info label-sm" onclick="copyText('@wsConfig.WsService')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                            <p><strong>Webservice Port: </strong>@(string.IsNullOrEmpty(wsConfig.WsPort) ? "Not Specified" : wsConfig.WsPort) <span class="label label-info label-sm" onclick="copyText('@(string.IsNullOrEmpty(wsConfig.WsPort) ? "Not Specified" : wsConfig.WsPort)')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                            <p><strong>WSDL Connector Config: </strong>@(string.IsNullOrEmpty(wsConfig.WsconnectorConfig) ? "Not Specified" : wsConfig.WsconnectorConfig) <span class="label label-info label-sm" onclick="copyText('@(string.IsNullOrEmpty(wsConfig.WsconnectorConfig) ? "Not Specified" : wsConfig.WsconnectorConfig)')" style="cursor: pointer; font-size: 10px; margin-left:10px;">Copy</span></p>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+
+                <h5> No Database config details available in this file.</h5>
+
+            }
+        }
+
+
+
+    </div>
+
+    if (Model.parsedXml.SqlData != null)
+    {
+        if (Model.parsedXml.SqlData.Count > 0)
+        {
+            <div class="row container">
+                <h3>Database Resources</h3>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Database Type</th>
+                            <th>Operation</th>
+                            <th>Stored Procedure</th>
+                            <th>Tables</th>
+                            <th>Columns Referred</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var SqlData in Model.parsedXml.SqlData)
+                        {
+
+                            <tr>
+                                @if (!SqlData.isStoredProcedure)
+                                {
+                                    <td>@SqlData.databaseType</td>
+                                    <td>@SqlData.operation</td>
+                                    <td>NOT APPLICABLE</td>
+                                    <td>
+                                        @foreach (var table in SqlData.tableNames)
+                                        {
+                                            <li class="list-group-item">@table</li>
+                                        }
+                                    </td>
+                                    <td>
+                                        @foreach (var column in SqlData.columnNames)
+                                        {
+                                            <li class="list-group-item">@column</li>
+                                        }
+
+                                    </td>
+                                }
+                                else
+                                {
+
+                                    <td>@SqlData.databaseType</td>
+                                    <td>@SqlData.operation</td>
+                                    <td>@SqlData.storedProcedure</td>
+                                    <td></td>
+                                    <td></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+<script type="text/javascript">
+
+    $('.panel-collapse').on('show.bs.collapse', function () {
+        $(this).siblings('.panel-heading').addClass('active');
+    });
+
+    $('.panel-collapse').on('hide.bs.collapse', function () {
+        $(this).siblings('.panel-heading').removeClass('active');
+    });
+
+    var copyText = function (text) {
+        var dummy = document.createElement("input");
+        document.body.appendChild(dummy);
+        dummy.setAttribute('value', text);
+        dummy.select();
+        document.execCommand("copy");
+        document.body.removeChild(dummy);
+
+    };
+
+</script>

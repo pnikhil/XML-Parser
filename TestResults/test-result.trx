@@ -1,0 +1,166 @@
+﻿<?xml version="1.0" encoding="utf-8"?><TestRun id="e2aa7101-6e37-49d6-aa3d-0f15dcbea8ab" name="nikhiln@WS-FOB-2161B 2018-09-12 12:42:51" runUser="HSCNET\nikhiln" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Times creation="2018-09-12T12:42:51.9810770-04:00" queuing="2018-09-12T12:42:51.9810770-04:00" start="2018-09-12T12:42:51.3926674-04:00" finish="2018-09-12T12:42:52.1091665-04:00" /><TestSettings name="default" id="171c9f3d-5aec-42b4-93fd-31c2feca68db"><Deployment runDeploymentRoot="nikhiln_WS-FOB-2161B_2018-09-12_12_42_51" /></TestSettings><Results><UnitTestResult executionId="b7511861-31a9-48b3-8d17-062a76d4fd8a" testId="b8940e58-a337-9ea7-2192-430a0c543aea" testName="CreateAndDeleteFile" computerName="WS-FOB-2161B" duration="00:00:00.1075990" startTime="2018-09-12T12:42:51.6548499-04:00" endTime="2018-09-12T12:42:51.9170321-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b7511861-31a9-48b3-8d17-062a76d4fd8a"><Output><StdOut>Debug Trace:
+C:\Projects\XML-Parser\XML-Parser.Tests\Files\sys-student.xml&#xD;
+True</StdOut><ErrorInfo><Message>Assert.AreEqual failed. Expected:&lt;True&gt;. Actual:&lt;False&gt;. </Message><StackTrace>   at XML_Parser.Tests.XmlTest.CreateAndDeleteFile() in C:\Projects\XML-Parser\XML-Parser.Tests\XmlTest.cs:line 32&#xD;
+</StackTrace></ErrorInfo></Output></UnitTestResult><UnitTestResult executionId="e2010d7f-1d55-4b25-a9dd-6726ec4dcd5d" testId="75be4eb7-cf57-ce44-d85e-bc766dcbd8b5" testName="CheckParser" computerName="WS-FOB-2161B" duration="00:00:00.0295625" startTime="2018-09-12T12:42:51.9270394-04:00" endTime="2018-09-12T12:42:51.9570603-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e2010d7f-1d55-4b25-a9dd-6726ec4dcd5d"><Output><StdOut>context:property-placeholder&#xD;
+----------------------&#xD;
+location -&gt; sys.students.${mule.env}.properties&#xD;
+
+&#xD;
+tls:context&#xD;
+----------------------&#xD;
+name -&gt; TLS_Context&#xD;
+doc:name -&gt; TLS Context&#xD;
+
+&#xD;
+Child node name: tls:key-store&#xD;
++++++++++++++++&#xD;
+type -&gt; jks&#xD;
+path -&gt; usf-keystore.jks&#xD;
+alias -&gt; ${jks.alias}&#xD;
+keyPassword -&gt; ${jks.key.password}&#xD;
+password -&gt; ${jks.password}&#xD;
+
+&#xD;
+
+&#xD;
+apikit:config&#xD;
+----------------------&#xD;
+name -&gt; api-config&#xD;
+raml -&gt; api.raml&#xD;
+consoleEnabled -&gt; false&#xD;
+doc:name -&gt; Router&#xD;
+
+&#xD;
+api-platform-gw:api&#xD;
+----------------------&#xD;
+apiName -&gt; ${api.name}&#xD;
+version -&gt; ${api.version}&#xD;
+flowRef -&gt; api-main&#xD;
+create -&gt; true&#xD;
+apikitRef -&gt; api-config&#xD;
+doc:name -&gt; API Autodiscovery&#xD;
+
+&#xD;
+http:listener-config&#xD;
+----------------------&#xD;
+name -&gt; api-httpListenerConfig&#xD;
+protocol -&gt; HTTPS&#xD;
+host -&gt; ${http.host}&#xD;
+port -&gt; ${https.port}&#xD;
+doc:name -&gt; HTTP Listener Configuration&#xD;
+tlsContext-ref -&gt; TLS_Context&#xD;
+
+&#xD;
+http:request-config&#xD;
+----------------------&#xD;
+name -&gt; HTTP_Request_Configuration_Identity&#xD;
+protocol -&gt; HTTPS&#xD;
+host -&gt; ${sys.students.identity.host}&#xD;
+port -&gt; ${sys.students.identity.port}&#xD;
+basePath -&gt; ${sys.students.identity.base.path}&#xD;
+doc:name -&gt; HTTP Request Configuration&#xD;
+
+&#xD;
+core-utils:config&#xD;
+----------------------&#xD;
+name -&gt; CoreUtils__Configuration&#xD;
+apiPath -&gt; ${core.utils.api.path}&#xD;
+apiUrl -&gt; ${core.utils.api.url}&#xD;
+clientId -&gt; ${app.client.id}&#xD;
+clientSecret -&gt; ${app.client.secret}&#xD;
+doc:name -&gt; CoreUtils: Configuration&#xD;
+
+&#xD;
+db:oracle-config&#xD;
+----------------------&#xD;
+name -&gt; Oracle_Configuration_BANNER&#xD;
+url -&gt; jdbc:oracle:thin:${banner.user}/${banner.password}@ldap://${banner.ldap}/${banner.instance},cn=OracleContext,dc=it,dc=usf,dc=edu&#xD;
+doc:name -&gt; Oracle Configuration&#xD;
+
+&#xD;
+Child node name: db:pooling-profile&#xD;
++++++++++++++++&#xD;
+maxPoolSize -&gt; 5&#xD;
+minPoolSize -&gt; 1&#xD;
+preparedStatementCacheSize -&gt; 30&#xD;
+
+&#xD;
+
+&#xD;
+
+&#xD;
+db:oracle-config&#xD;
+----------------------&#xD;
+name -&gt; Oracle_Configuration_BANNER_NO_POOLING&#xD;
+url -&gt; jdbc:oracle:thin:${banner.user}/${banner.password}@ldap://${banner.ldap}/${banner.instance},cn=OracleContext,dc=it,dc=usf,dc=edu&#xD;
+doc:name -&gt; Oracle Configuration&#xD;
+
+&#xD;
+Child node name: db:pooling-profile&#xD;
++++++++++++++++&#xD;
+maxPoolSize -&gt; 1&#xD;
+minPoolSize -&gt; 1&#xD;
+preparedStatementCacheSize -&gt; 0&#xD;
+
+&#xD;
+
+&#xD;
+db:oracle-config&#xD;
+----------------------&#xD;
+name -&gt; Oracle_Configuration_DegreeWorks&#xD;
+doc:name -&gt; Oracle Configuration&#xD;
+url -&gt; jdbc:oracle:thin:${degreeWorks.user}/${degreeWorks.password}@ldap://${degreeWorks.ldap}/${degreeWorks.instance},cn=OracleContext,dc=it,dc=usf,dc=edu&#xD;
+
+&#xD;
+Child node name: db:pooling-profile&#xD;
++++++++++++++++&#xD;
+maxPoolSize -&gt; 20&#xD;
+minPoolSize -&gt; 1&#xD;
+acquireIncrement -&gt; 1&#xD;
+preparedStatementCacheSize -&gt; 10&#xD;
+
+&#xD;
+
+&#xD;
+
+&#xD;
+db:generic-config&#xD;
+----------------------&#xD;
+name -&gt; FAIR_Database_Configuration&#xD;
+url -&gt; jdbc:sqlserver://${fair.ip};user=${fair.user};password=${fair.password}&#xD;
+driverClassName -&gt; com.microsoft.sqlserver.jdbc.SQLServerDriver&#xD;
+doc:name -&gt; Generic Database Configuration&#xD;
+
+&#xD;
+db:mysql-config&#xD;
+----------------------&#xD;
+name -&gt; MySQL_Configuration_AppianDb&#xD;
+host -&gt; ${appiandb.host}&#xD;
+port -&gt; ${appiandb.port}&#xD;
+user -&gt; ${appiandb.user}&#xD;
+password -&gt; ${appiandb.password}&#xD;
+database -&gt; ${appiandb.database}&#xD;
+doc:name -&gt; MySQL Configuration&#xD;
+connectionTimeout -&gt; 0&#xD;
+
+&#xD;
+Child node name: db:pooling-profile&#xD;
++++++++++++++++&#xD;
+maxPoolSize -&gt; 1&#xD;
+minPoolSize -&gt; 1&#xD;
+preparedStatementCacheSize -&gt; 10&#xD;
+
+&#xD;
+
+&#xD;
+
+&#xD;
+configuration&#xD;
+----------------------&#xD;
+doc:name -&gt; Configuration&#xD;
+
+&#xD;
+
+&#xD;
+XML_Parser.Models.Document&#xD;
+Printing Dictionary</StdOut></Output></UnitTestResult><UnitTestResult executionId="160b9590-db5a-4b0f-a94c-356c1a896e21" testId="e2a0b55a-0710-3c0d-a971-92a8b6ac85cd" testName="ValidateInvalidIPAddress" computerName="WS-FOB-2161B" duration="00:00:00.0001443" startTime="2018-09-12T12:42:51.9780749-04:00" endTime="2018-09-12T12:42:51.9780749-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="160b9590-db5a-4b0f-a94c-356c1a896e21" /><UnitTestResult executionId="5c5d4155-f627-44a3-815e-59001f9fad76" testId="500c3f71-3a6f-453c-aeca-93bcb9f9ad2d" testName="ValidateBitCoinAddress" computerName="WS-FOB-2161B" duration="00:00:00.0000968" startTime="2018-09-12T12:42:51.9790756-04:00" endTime="2018-09-12T12:42:51.9800763-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5c5d4155-f627-44a3-815e-59001f9fad76" /><UnitTestResult executionId="a6c1c323-9d22-424f-b1fa-2c2bf6c6f31d" testId="e94f98f3-2805-ea8a-f028-367062e2fe7f" testName="ValidateEthereumAddress" computerName="WS-FOB-2161B" duration="00:00:00.0005862" startTime="2018-09-12T12:42:51.9800763-04:00" endTime="2018-09-12T12:42:51.9800763-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a6c1c323-9d22-424f-b1fa-2c2bf6c6f31d" /><UnitTestResult executionId="ac267fe1-85d7-4950-887b-c76f3bb74fbb" testId="f811f057-6c38-c6bf-2478-25bfdafc6aa3" testName="ValidateIncorrectEmailAddressWithOutAT" computerName="WS-FOB-2161B" duration="00:00:00.0001225" startTime="2018-09-12T12:42:51.9730714-04:00" endTime="2018-09-12T12:42:51.9730714-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ac267fe1-85d7-4950-887b-c76f3bb74fbb" /><UnitTestResult executionId="cc882461-7ea9-4984-ad9e-99493bc02be0" testId="8615d2da-12c3-5ed2-fbab-03cda73391ca" testName="ValidateIncorrectEmailAddressWithOutDomain" computerName="WS-FOB-2161B" duration="00:00:00.0001077" startTime="2018-09-12T12:42:51.9740721-04:00" endTime="2018-09-12T12:42:51.9740721-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cc882461-7ea9-4984-ad9e-99493bc02be0" /><UnitTestResult executionId="c975d3e1-b4db-4a63-8a43-87f55a92eb9f" testId="bae20edc-a3a6-9709-897a-4562e799e9ae" testName="ValidateNumeric" computerName="WS-FOB-2161B" duration="00:00:00.0000914" startTime="2018-09-12T12:42:51.9790756-04:00" endTime="2018-09-12T12:42:51.9790756-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c975d3e1-b4db-4a63-8a43-87f55a92eb9f" /><UnitTestResult executionId="a1060215-aa51-4e03-acda-8e9af8afff5a" testId="f564cb8c-d065-5e06-f376-aceacd4ab0a3" testName="ValidateNotNumeric" computerName="WS-FOB-2161B" duration="00:00:00.0000910" startTime="2018-09-12T12:42:51.9790756-04:00" endTime="2018-09-12T12:42:51.9790756-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a1060215-aa51-4e03-acda-8e9af8afff5a" /><UnitTestResult executionId="de5cac73-411d-4e8e-b7f4-70f02a341ff2" testId="8e013c3e-24d7-133e-682d-69282e6ee93d" testName="ValidateInternationNumberWithPlus" computerName="WS-FOB-2161B" duration="00:00:00.0139685" startTime="2018-09-12T12:42:51.9570603-04:00" endTime="2018-09-12T12:42:51.9710701-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="de5cac73-411d-4e8e-b7f4-70f02a341ff2" /><UnitTestResult executionId="1c81c730-81c2-46ce-b720-e333473ff458" testId="2d9aec99-945f-9fc8-2263-3b7a99d18375" testName="ValidateIPAddress" computerName="WS-FOB-2161B" duration="00:00:00.0008037" startTime="2018-09-12T12:42:51.9770742-04:00" endTime="2018-09-12T12:42:51.9780749-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1c81c730-81c2-46ce-b720-e333473ff458" /><UnitTestResult executionId="75844513-1574-441f-8c50-99557b9b673b" testId="2b6efe5c-9196-2b42-e164-1a689b2eae58" testName="ValidateEmailAddress" computerName="WS-FOB-2161B" duration="00:00:00.0009108" startTime="2018-09-12T12:42:51.9720708-04:00" endTime="2018-09-12T12:42:51.9730714-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="75844513-1574-441f-8c50-99557b9b673b" /><UnitTestResult executionId="b2c650cf-0358-4b8a-8d8b-0e9547d93839" testId="5ad6706f-45a1-2b36-aaa4-5543323d7c55" testName="ValidateAlphaChar" computerName="WS-FOB-2161B" duration="00:00:00.0000965" startTime="2018-09-12T12:42:51.9780749-04:00" endTime="2018-09-12T12:42:51.9790756-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b2c650cf-0358-4b8a-8d8b-0e9547d93839" /><UnitTestResult executionId="f769d85d-412f-43cf-a088-312abd7fb566" testId="1ddf51a3-d568-1ac1-6305-e869b4d3cfa1" testName="ValidateInternationNumberWithOutPlus" computerName="WS-FOB-2161B" duration="00:00:00.0001045" startTime="2018-09-12T12:42:51.9710701-04:00" endTime="2018-09-12T12:42:51.9720708-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f769d85d-412f-43cf-a088-312abd7fb566" /><UnitTestResult executionId="bf04ae52-245f-4035-81b9-56ccab1f191d" testId="81539bbb-84b9-23dc-3cf7-74b3de7cc1be" testName="ValidateNonAlphaChar" computerName="WS-FOB-2161B" duration="00:00:00.0000997" startTime="2018-09-12T12:42:51.9790756-04:00" endTime="2018-09-12T12:42:51.9790756-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bf04ae52-245f-4035-81b9-56ccab1f191d" /><UnitTestResult executionId="c36a8be5-ae66-434c-a40f-f46059785198" testId="98d76aaf-b2e5-3788-7038-a4b801c70519" testName="ValidateInternationNumberNoAlpha" computerName="WS-FOB-2161B" duration="00:00:00.0001866" startTime="2018-09-12T12:42:51.9720708-04:00" endTime="2018-09-12T12:42:51.9720708-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c36a8be5-ae66-434c-a40f-f46059785198" /><UnitTestResult executionId="5fda04e3-9644-4c86-b9f6-310a30e309f0" testId="519d7055-187c-90d7-109f-aa3682809daf" testName="ValidateIncorrectEmailAddressWithOutDot" computerName="WS-FOB-2161B" duration="00:00:00.0001177" startTime="2018-09-12T12:42:51.9730714-04:00" endTime="2018-09-12T12:42:51.9740721-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5fda04e3-9644-4c86-b9f6-310a30e309f0" /></Results><TestDefinitions><UnitTest name="ValidateIncorrectEmailAddressWithOutDomain" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="8615d2da-12c3-5ed2-fbab-03cda73391ca"><Execution id="cc882461-7ea9-4984-ad9e-99493bc02be0" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateIncorrectEmailAddressWithOutDomain" /></UnitTest><UnitTest name="ValidateInvalidIPAddress" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="e2a0b55a-0710-3c0d-a971-92a8b6ac85cd"><Execution id="160b9590-db5a-4b0f-a94c-356c1a896e21" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateInvalidIPAddress" /></UnitTest><UnitTest name="ValidateIncorrectEmailAddressWithOutAT" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="f811f057-6c38-c6bf-2478-25bfdafc6aa3"><Execution id="ac267fe1-85d7-4950-887b-c76f3bb74fbb" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateIncorrectEmailAddressWithOutAT" /></UnitTest><UnitTest name="ValidateNumeric" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="bae20edc-a3a6-9709-897a-4562e799e9ae"><Execution id="c975d3e1-b4db-4a63-8a43-87f55a92eb9f" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateNumeric" /></UnitTest><UnitTest name="ValidateBitCoinAddress" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="500c3f71-3a6f-453c-aeca-93bcb9f9ad2d"><Execution id="5c5d4155-f627-44a3-815e-59001f9fad76" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateBitCoinAddress" /></UnitTest><UnitTest name="CheckParser" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="75be4eb7-cf57-ce44-d85e-bc766dcbd8b5"><Execution id="e2010d7f-1d55-4b25-a9dd-6726ec4dcd5d" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="CheckParser" /></UnitTest><UnitTest name="ValidateInternationNumberNoAlpha" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="98d76aaf-b2e5-3788-7038-a4b801c70519"><Execution id="c36a8be5-ae66-434c-a40f-f46059785198" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateInternationNumberNoAlpha" /></UnitTest><UnitTest name="ValidateNotNumeric" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="f564cb8c-d065-5e06-f376-aceacd4ab0a3"><Execution id="a1060215-aa51-4e03-acda-8e9af8afff5a" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateNotNumeric" /></UnitTest><UnitTest name="ValidateInternationNumberWithPlus" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="8e013c3e-24d7-133e-682d-69282e6ee93d"><Execution id="de5cac73-411d-4e8e-b7f4-70f02a341ff2" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateInternationNumberWithPlus" /></UnitTest><UnitTest name="ValidateIPAddress" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="2d9aec99-945f-9fc8-2263-3b7a99d18375"><Execution id="1c81c730-81c2-46ce-b720-e333473ff458" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateIPAddress" /></UnitTest><UnitTest name="ValidateAlphaChar" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="5ad6706f-45a1-2b36-aaa4-5543323d7c55"><Execution id="b2c650cf-0358-4b8a-8d8b-0e9547d93839" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateAlphaChar" /></UnitTest><UnitTest name="ValidateEmailAddress" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="2b6efe5c-9196-2b42-e164-1a689b2eae58"><Execution id="75844513-1574-441f-8c50-99557b9b673b" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateEmailAddress" /></UnitTest><UnitTest name="CreateAndDeleteFile" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="b8940e58-a337-9ea7-2192-430a0c543aea"><Execution id="b7511861-31a9-48b3-8d17-062a76d4fd8a" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="CreateAndDeleteFile" /></UnitTest><UnitTest name="ValidateEthereumAddress" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="e94f98f3-2805-ea8a-f028-367062e2fe7f"><Execution id="a6c1c323-9d22-424f-b1fa-2c2bf6c6f31d" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateEthereumAddress" /></UnitTest><UnitTest name="ValidateIncorrectEmailAddressWithOutDot" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="519d7055-187c-90d7-109f-aa3682809daf"><Execution id="5fda04e3-9644-4c86-b9f6-310a30e309f0" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateIncorrectEmailAddressWithOutDot" /></UnitTest><UnitTest name="ValidateNonAlphaChar" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="81539bbb-84b9-23dc-3cf7-74b3de7cc1be"><Execution id="bf04ae52-245f-4035-81b9-56ccab1f191d" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateNonAlphaChar" /></UnitTest><UnitTest name="ValidateInternationNumberWithOutPlus" storage="c:\projects\xml-parser\xml-parser.tests\bin\debug\xml-parser.tests.dll" id="1ddf51a3-d568-1ac1-6305-e869b4d3cfa1"><Execution id="f769d85d-412f-43cf-a088-312abd7fb566" /><TestMethod codeBase="C:\Projects\XML-Parser\XML-Parser.Tests\bin\Debug\XML-Parser.Tests.dll" adapterTypeName="executor://mstestadapter/v2" className="XML_Parser.Tests.XmlTest" name="ValidateInternationNumberWithOutPlus" /></UnitTest></TestDefinitions><TestEntries><TestEntry testId="b8940e58-a337-9ea7-2192-430a0c543aea" executionId="b7511861-31a9-48b3-8d17-062a76d4fd8a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="75be4eb7-cf57-ce44-d85e-bc766dcbd8b5" executionId="e2010d7f-1d55-4b25-a9dd-6726ec4dcd5d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="e2a0b55a-0710-3c0d-a971-92a8b6ac85cd" executionId="160b9590-db5a-4b0f-a94c-356c1a896e21" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="500c3f71-3a6f-453c-aeca-93bcb9f9ad2d" executionId="5c5d4155-f627-44a3-815e-59001f9fad76" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="e94f98f3-2805-ea8a-f028-367062e2fe7f" executionId="a6c1c323-9d22-424f-b1fa-2c2bf6c6f31d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="f811f057-6c38-c6bf-2478-25bfdafc6aa3" executionId="ac267fe1-85d7-4950-887b-c76f3bb74fbb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="8615d2da-12c3-5ed2-fbab-03cda73391ca" executionId="cc882461-7ea9-4984-ad9e-99493bc02be0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="bae20edc-a3a6-9709-897a-4562e799e9ae" executionId="c975d3e1-b4db-4a63-8a43-87f55a92eb9f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="f564cb8c-d065-5e06-f376-aceacd4ab0a3" executionId="a1060215-aa51-4e03-acda-8e9af8afff5a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="8e013c3e-24d7-133e-682d-69282e6ee93d" executionId="de5cac73-411d-4e8e-b7f4-70f02a341ff2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="2d9aec99-945f-9fc8-2263-3b7a99d18375" executionId="1c81c730-81c2-46ce-b720-e333473ff458" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="2b6efe5c-9196-2b42-e164-1a689b2eae58" executionId="75844513-1574-441f-8c50-99557b9b673b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="5ad6706f-45a1-2b36-aaa4-5543323d7c55" executionId="b2c650cf-0358-4b8a-8d8b-0e9547d93839" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="1ddf51a3-d568-1ac1-6305-e869b4d3cfa1" executionId="f769d85d-412f-43cf-a088-312abd7fb566" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="81539bbb-84b9-23dc-3cf7-74b3de7cc1be" executionId="bf04ae52-245f-4035-81b9-56ccab1f191d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="98d76aaf-b2e5-3788-7038-a4b801c70519" executionId="c36a8be5-ae66-434c-a40f-f46059785198" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestEntry testId="519d7055-187c-90d7-109f-aa3682809daf" executionId="5fda04e3-9644-4c86-b9f6-310a30e309f0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" /></TestEntries><TestLists><TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" /><TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" /></TestLists><ResultSummary outcome="Failed"><Counters total="17" executed="17" passed="16" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" /></ResultSummary></TestRun>

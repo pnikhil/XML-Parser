@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="getStudentLearnerRecordFlow">
+      <set-variable variableName="flowName" value="getStudentLearnerRecordFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+    <set-variable variableName="usfId" value="#[message.inboundProperties.'http.uri.params'.studentId]" doc:name="set usfId"/>
+        <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get student Information">
+            <db:parameterized-query><![CDATA[SELECT     p.spriden_pidm pidm,
+           p.spriden_id usfId,
+           p.spriden_first_name firstName,
+           p.spriden_mi middleName,
+           p.spriden_last_name  lastName,
+           spbpers_sex gender,
+           to_char(spbpers_birth_date,'MMDDYYYY')DOB,
+          -- NVL(s.sgbstdn_astd_code,'UNDEFINED') academicStanding,
+           stvresd_desc residency,
+           stvcamp_desc campus,
+           s.sgbstdn_levl_code studentLevel,
+           s.sgbstdn_term_code_ctlg_1 catalogYear,
+           s.sgbstdn_styp_code studentType,
+           s.sgbstdn_stst_code statusCode,
+           stvstst_desc statusDescription
+           FROM sgbstdn s
+           INNER JOIN SPRIDEN p
+           ON (s.sgbstdn_pidm =p.spriden_pidm
+           AND p.spriden_change_ind IS NULL
+           AND p.spriden_id= #[flowVars.usfId])
+           INNER JOIN stvcamp
+           ON (stvcamp_code = sgbstdn_camp_code)
+           INNER JOIN spbpers b
+           ON(s.sgbstdn_pidm = b.spbpers_pidm)
+           LEFT OUTER JOIN stvresd
+           ON (s.sgbstdn_resd_code = stvresd_code)
+           INNER JOIN stvstst
+           ON stvstst_code = s.sgbstdn_stst_code
+WHERE
+s.sgbstdn_term_code_eff=(Select MAX(b.sgbstdn_term_code_eff) from sgbstdn b
+                            WHere s.sgbstdn_pidm=b.sgbstdn_pidm
+                            and b.sgbstdn_term_code_eff <=#[flowVars.currentTerm])]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="mainPayload" value="#[payload]" doc:name="mainPayload"/>
+        <set-variable variableName="pidm" value="#[payload[0].PIDM]" doc:name="set pidm"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getStudentLearnerRecordFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

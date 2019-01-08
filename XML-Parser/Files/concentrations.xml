@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+    <flow name="initializeConcentrationsFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Set the key flowVars for flow">
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.studentId]"/>
+            <add-message-property key="currKeySeqNo" value="#[payload.applicationNumber]"/>
+            <add-message-property key="fosTerm" value="#[payload.applicationTerm]"/>
+            <add-message-property key="fosOldConc" value="#[payload.oldConcentration]"/>
+            <add-message-property key="fosMajor" value="#[payload.major]"/>
+            <add-message-property key="fosNewConc" value="#[payload.newConcentration]"/>
+        </message-properties-transformer>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Route message based on a PIDM found">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Invalid USF ID.']]" doc:name="Set Payload to invalid usfId"/>
+                <flow-ref name="ConvertToJavaAndConcentrationsPayloadFlow" doc:name="ConvertToJavaAndConcentrationsPayloadFlow"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="pidm" value="#[payload[0].pidm]" doc:name="Set PIDM"/>
+                <flow-ref name="concentrationsTransactionFlow" doc:name="concentrationsTransactionFlow"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="postConcentrationsFlow">
+        <set-variable variableName="method" value="post" doc:name="Set method variable to post"/>
+        <flow-ref name="initializeConcentrationsFlow" doc:name="initializeConcentrationsFlow"/>
+        <dw:transform-message doc:name="Transform post Concentrations Status JSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"usfId":flowVars.usfId,
+	"pidm":flowVars.pidm,
+	"status":"False" when (flowVars.concentrationPayload.P_MSG_TYPE_OUT == "F" or flowVars.fosPayload[1][0].STDN_CHECK != null) otherwise "True",
+	"messages": "NOTE* Concentration successfully added to admissions application. Changes made to the application will not update existing student records." when (flowVars.fosPayload[1][0].STDN_CHECK != null and flowVars.concentrationPayload.P_MSG_TYPE_OUT == null) 
+	            otherwise flowVars.concentrationPayload.P_MSG_OUT when flowVars.concentrationPayload.P_MSG_TYPE_OUT == 'F' 
+	            otherwise "Concentration successfully added to admissions application"
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="concentrationsTransactionFlow">
+        <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+            <logger message="#[&quot;Transaction method is: &quot; + flowVars.method]" level="INFO" doc:name="Logger"/>
+            <choice doc:name="Route message based on method">
+                <when expression="#[flowVars.method == &quot;delete&quot;]">
+                    <flow-ref name="deleteConcentrationsDBFlow" doc:name="deleteConcentrationsDBFlow"/>
+                    <logger message="#[&quot;Payload after Post Concentrations:&quot; + payload]" level="INFO" doc:name="Logger"/>
+                </when>
+                <otherwise>
+                    <flow-ref name="postConcentrationsDBFlow" doc:name="postConcentrationsDBFlow"/>
+                    <logger message="#[&quot;Payload after Delete Concentrations:&quot; + payload]" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+            <flow-ref name="ConvertToJavaAndConcentrationsPayloadFlow" doc:name="ConvertToJavaAndConcentrationsPayloadFlow"/>
+            <logger message="#[&quot;Flowvars Payload: &quot; + flowVars.concentrationPayload]" level="INFO" doc:name="Logger"/>
+            <choice doc:name="Check if Indicator is F. All other indicators are ok to continue processing.">
+                <when expression="#[concentrationPayload.P_MSG_TYPE_OUT == &quot;F&quot;]">
+                    <db:execute-ddl config-ref="Oracle_Configuration_BANNER" doc:name="Rollback">
+                        <db:dynamic-query><![CDATA[ROLLBACK]]></db:dynamic-query>
+                    </db:execute-ddl>
+                </when>
+                <otherwise>
+                    <db:execute-ddl config-ref="Oracle_Configuration_BANNER" doc:name="Commit the transanction">
+                        <db:dynamic-query><![CDATA[COMMIT]]></db:dynamic-query>
+                    </db:execute-ddl>
+                </otherwise>
+            </choice>
+        </transactional>
+    </flow>
+    <flow name="ConvertToJavaAndConcentrationsPayloadFlow">
+        <dw:transform-message doc:name="Convert to Java and save in concentration Payload Variable">
+            <dw:set-variable variableName="concentrationPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+    </flow>
+    <flow name="postConcentrationsDBFlow">
+        <set-variable variableName="flowName" value="postConcentrationsDBFlow" doc:name="Set flow variable for flowName"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <scatter-gather doc:name="Scatter-Gather">
+            <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Fetch current major associated with the curriculum rule and concentration rule number ">
+                <db:parameterized-query><![CDATA[SELECT
+    sovlfos_pidm,
+    sovlfos_lcur_seqno,
+    sovlfos_seqno,
+    sovlfos_lfst_code,
+    sovlfos_term_code,
+    sovlfos_priority_no,
+    sovlfos_csts_code,
+    sovlfos_cact_code,
+    sovlfos_data_origin,
+    sovlfos_user_id,
+    sovlfos_activity_date,
+    sovlfos_majr_code,
+    sovlfos_term_code_ctlg,
+    sovlfos_term_code_end,
+    sovlfos_dept_code,
+    sovlfos_lfos_rule,
+    sovlfos_conc_attach_rule,
+    sovlfos_conc_attach_majr_code,
+    sovlfos_majr_code_attach,
+    sovlfos_start_date,
+    sovlfos_end_date,
+    sovlfos_tmst_code,
+    sovlfos_rolled_seqno,
+    sovlcur_curr_rule,
+    (
+        SELECT
+            bx.sorcmjr_dept_code
+        FROM
+            sorcmjr bx
+        WHERE
+                bx.sorcmjr_curr_rule = sovlcur_curr_rule
+            AND
+                bx.sorcmjr_majr_code = #[flowVars.fosNewConc]
+            AND
+                bx.sorcmjr_adm_ind = 'Y'
+            AND
+                bx.sorcmjr_term_code_eff = (
+                    SELECT
+                        MAX(m.sorcmjr_term_code_eff)
+                    FROM
+                        sorcmjr m
+                    WHERE
+                            m.sorcmjr_curr_rule = bx.sorcmjr_curr_rule
+                        AND
+                            m.sorcmjr_majr_code = bx.sorcmjr_majr_code
+                        AND
+                            m.sorcmjr_term_code_eff <= #[flowVars.fosTerm]
+                )
+    ) newconcdept,
+    (
+        SELECT
+            sorccon_cmjr_rule
+        FROM
+            sorcmjr x,
+            sorccon a
+        WHERE
+                x.sorcmjr_curr_rule = sovlcur_curr_rule
+            AND
+                x.sorcmjr_majr_code = sovlfos_majr_code
+            AND
+                x.sorcmjr_cmjr_rule = a.sorccon_cmjr_rule
+            AND
+                x.sorcmjr_adm_ind = 'Y'
+            AND
+                x.sorcmjr_term_code_eff = (
+                    SELECT
+                        MAX(y.sorcmjr_term_code_eff)
+                    FROM
+                        sorcmjr y
+                    WHERE
+                            y.sorcmjr_curr_rule = x.sorcmjr_curr_rule
+                        AND
+                            y.sorcmjr_majr_code = x.sorcmjr_majr_code
+                        AND
+                            y.sorcmjr_term_code_eff <= #[flowVars.fosTerm]
+                )
+            AND
+                a.sorccon_majr_code_conc =#[flowVars.fosNewConc]
+            AND
+                a.sorccon_curr_rule = sovlcur_curr_rule
+            AND
+                a.sorccon_adm_ind = 'Y'
+            AND
+                a.sorccon_term_code_eff = (
+                    SELECT
+                        MAX(m.sorccon_term_code_eff)
+                    FROM
+                        sorccon m
+                    WHERE
+                            m.sorccon_curr_rule = a.sorccon_curr_rule
+                        AND
+                            m.sorccon_majr_code_conc = a.sorccon_majr_code_conc
+                        AND
+                            m.sorccon_cmjr_rule = a.sorccon_cmjr_rule
+                        AND
+                            m.sorccon_term_code_eff <= #[flowVars.fosTerm]
+                )
+    ) newconcrule
+FROM
+    sovlfos
+    INNER JOIN sovlcur ON
+        sovlcur_pidm = sovlfos_pidm
+    AND
+        sovlcur_lmod_code = #[flowVars.curriculumModule]
+    AND
+        sovlcur_term_code = sovlfos_term_code
+    AND
+        sovlcur_key_seqno = #[flowVars.currKeySeqNo]
+    AND
+        sovlcur_seqno = sovlfos_lcur_seqno
+    AND
+        sovlcur_current_ind = 'Y'
+    AND
+        sovlcur_active_ind = 'Y'
+WHERE
+        sovlfos_pidm = #[flowVars.pidm]
+    AND
+        sovlfos_term_code = #[flowVars.fosTerm]
+    AND
+        sovlfos_current_ind = 'Y'
+    AND
+        sovlfos_active_ind = 'Y'
+    AND
+        sovlfos_lfst_code = 'MAJOR']]></db:parameterized-query>
+            </db:select>
+            <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Check if a learner record exists as of the application term">
+                <db:parameterized-query><![CDATA[SELECT 'Y' stdn_check
+           FROM SGBSTDN
+          WHERE SGBSTDN.SGBSTDN_TERM_CODE_EFF =
+                (SELECT MAX(SGBSTDN_TERM_CODE_EFF) FROM SGBSTDN
+                  WHERE SGBSTDN_TERM_CODE_EFF >= #[flowVars.fosTerm]
+                    AND SGBSTDN_PIDM = #[flowVars.pidm])
+            AND SGBSTDN.SGBSTDN_PIDM = #[flowVars.pidm]]]></db:parameterized-query>
+            </db:select>
+        </scatter-gather>
+        <dw:transform-message doc:name="Transform Message to java and save in fosPayload variable">
+            <dw:set-variable variableName="fosPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.fosPayload[0].size()==0]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Active curriculum for term:' + fosTerm + ' application number:' + currKeySeqNo +' and Major:' +  fosMajor + ' field of study not found to add concentration']]" doc:name="Set Payload to False if parent major code to which the concentration needs to be attached is not found"/>
+            </when>
+            <when expression="#[fosMajor != flowVars.fosPayload[0][0].sovlfos_majr_code]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Major code in the request does not match the field of study Major']]" doc:name="Set Payload to False if the Major code in the request does not match the current Major in the Admissions curriculum"/>
+            </when>
+            <otherwise>
+                <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="processNewConcentrations">
+                    <db:parameterized-query><![CDATA[call BANINST1.SB_FIELDOFSTUDY.P_CREATE (
+    :P_PIDM,
+    :P_LCUR_SEQNO,
+    :P_SEQNO,
+    :P_LFST_CODE,
+    :P_TERM_CODE,
+    :P_PRIORITY_NO,
+    :P_CSTS_CODE,
+    :P_CACT_CODE,
+    :P_DATA_ORIGIN,
+    :P_USER_ID,
+    :P_MAJR_CODE,
+    :P_TERM_CODE_CTLG,
+    :P_TERM_CODE_END,
+    :P_DEPT_CODE,
+    :P_LFOS_RULE,
+    :P_CONC_ATTACH_RULE,
+    :P_START_DATE,
+    :P_END_DATE,
+    :P_TMST_CODE,
+    :P_MAJR_CODE_ATTACH,
+    :P_ROLLED_SEQNO,
+    :P_OVERRIDE_SEVERITY,
+    :P_ROWID_OUT,
+    :P_CURR_ERROR_OUT,
+    :P_SEVERITY_OUT,
+    :P_LFOS_SEQNO_OUT,
+    :P_USER_ID_UPDATE,
+    :P_CURRENT_CDE
+  )]]></db:parameterized-query>
+                    <db:in-param name="P_PIDM" type="BIGINT" value="#[flowVars.pidm]"/>
+                    <db:in-param name="P_LCUR_SEQNO" type="INTEGER" value="#[flowVars.fosPayload[0][0].sovlfos_lcur_seqno]"/>
+                    <db:in-param name="P_SEQNO" type="INTEGER" value="#[null]"/>
+                    <db:in-param name="P_LFST_CODE" type="VARCHAR" value="CONCENTRATION"/>
+                    <db:in-param name="P_TERM_CODE" type="VARCHAR" value="#[flowVars.fosTerm]"/>
+                    <db:in-param name="P_PRIORITY_NO" type="INTEGER" value="1"/>
+                    <db:in-param name="P_CSTS_CODE" type="VARCHAR" value="#[flowVars.fosPayload[0][0].sovlfos_csts_code]"/>
+                    <db:in-param name="P_CACT_CODE" type="VARCHAR" value="#[flowVars.fosPayload[0][0].sovlfos_cact_code]"/>
+                    <db:in-param name="P_DATA_ORIGIN" type="VARCHAR" value="MuleSoft"/>
+                    <db:in-param name="P_USER_ID" type="VARCHAR" value="MULESOFT"/>
+                    <db:in-param name="P_MAJR_CODE" type="VARCHAR" value="#[flowVars.fosNewConc]"/>
+                    <db:in-param name="P_TERM_CODE_CTLG" type="VARCHAR" value="#[null]"/>
+                    <db:in-param name="P_TERM_CODE_END" type="VARCHAR" value="#[null]"/>
+                    <db:in-param name="P_DEPT_CODE" type="VARCHAR" value="#[flowVars.fosPayload[0][0].newconcdept]"/>
+                    <db:in-param name="P_LFOS_RULE" type="BIGINT" value="#[null]"/>
+                    <db:in-param name="P_CONC_ATTACH_RULE" type="BIGINT" value="#[flowVars.fosPayload[0][0].newconcrule]"/>
+                    <db:in-param name="P_START_DATE" type="DATE" value="#[null]"/>
+                    <db:in-param name="P_END_DATE" type="DATE" value="#[null]"/>
+                    <db:in-param name="P_TMST_CODE" type="VARCHAR" value="#[null]"/>
+                    <db:in-param name="P_MAJR_CODE_ATTACH" type="VARCHAR" value="#[flowVars.fosPayload[0][0].sovlfos_majr_code]"/>
+                    <db:in-param name="P_ROLLED_SEQNO" type="INTEGER" value="#[null]"/>
+                    <db:in-param name="P_OVERRIDE_SEVERITY" type="LONGVARCHAR" value="#[null]"/>
+                    <db:in-param name="P_USER_ID_UPDATE" type="VARCHAR" value="#[null]"/>
+                    <db:in-param name="P_CURRENT_CDE" type="VARCHAR" value="Y"/>
+                    <db:out-param name="P_ROWID_OUT" type="LONGVARCHAR"/>
+                    <db:out-param name="P_CURR_ERROR_OUT" type="BIGINT"/>
+                    <db:out-param name="P_SEVERITY_OUT" type="LONGVARCHAR"/>
+                    <db:out-param name="P_LFOS_SEQNO_OUT" type="NUMERIC"/>
+                </db:stored-procedure>
+            </otherwise>
+        </choice>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;postConcentrationsDBFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+              <choice-exception-strategy doc:name="Choice Exception Strategy">
+                <catch-exception-strategy when="#[exception.causedBy(java.sql.SQLException)]" doc:name="Catch Exception Strategy">
+                    <logger message="#[&quot;Exception Testing:&quot; + exception.cause]" level="INFO" doc:name="Logger"/>
+                <choice doc:name="Choice">
+                    <when expression="#[exception.message.contains(&quot;Required parent record not found&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Invalid Concentration Code" doc:name="dbErrMessage Invalid Concentration Code"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Invalid value for application decision code&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Required parent record not found" doc:name="dbErrMessage Parent Record Not Found"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Invalid major code attached to concentration&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Invalid major code attached to concentration" doc:name="dbErrMessage Invalid major code attached to concentration"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Required field of study parent record not found&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Required field of study parent record not found" doc:name="dbErrMessage Required field of study parent record not found"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Cannot create field of study, record already exists&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Cannot create concentration, record already exists" doc:name="dbErrMessage Cannot create concentration, record already exists"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Fatal: Curriculum, Concentration Invalid&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Curriculum, Concentration Invalid" doc:name="dbErrMessage Fatal: Curriculum, Concentration Invalid"/>
+                    </when>
+                    <otherwise>
+                        <set-variable variableName="dbErrMessage" value="Banner Database Error" doc:name="dbErrMessage Catch All"/>
+                    </otherwise>
+                </choice>
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':flowVars.dbErrMessage]]" mimeType="application/java" doc:name="Set Payload"/>
+                </catch-exception-strategy>
+            </choice-exception-strategy>
+    </flow>
+    <flow name="deleteConcentrationsFlow">
+        <set-variable variableName="method" value="delete" doc:name="Set method variable to delete"/>
+        <flow-ref name="initializeConcentrationsFlow" doc:name="initializeConcentrationsFlow"/>
+        <dw:transform-message doc:name="Transform delete Concentrations Status JSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"usfId":flowVars.usfId,
+	"pidm":flowVars.pidm,
+	"status":"False" when (flowVars.concentrationPayload.P_MSG_TYPE_OUT == "F" or flowVars.fosDelPayload[1][0].STDN_CHECK != null) otherwise "True",
+	"messages": "NOTE* Concentration successfully deleted from admissions application. Changes made to the application will not update existing student records." when (flowVars.fosDelPayload[1][0].STDN_CHECK != null and flowVars.concentrationPayload.P_MSG_TYPE_OUT == null) 
+	            otherwise flowVars.concentrationPayload.P_MSG_OUT when flowVars.concentrationPayload.P_MSG_TYPE_OUT == 'F' 
+	            otherwise "Concentration successfully deleted from admissions application"
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="deleteConcentrationsDBFlow">
+        <set-variable variableName="flowName" value="deleteConcentrationsDBFlow" doc:name="Set flow variable for flowName"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <scatter-gather doc:name="Scatter-Gather">
+            <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Fetch the current field of study concentration">
+                <db:parameterized-query><![CDATA[SELECT
+    sovlfos_pidm,
+    sovlfos_lcur_seqno,
+    sovlfos_seqno,
+    sovlfos_lfst_code,
+    sovlfos_term_code,
+    sovlfos_priority_no,
+    sovlfos_csts_code,
+    sovlfos_cact_code,
+    sovlfos_data_origin,
+    sovlfos_user_id,
+    sovlfos_activity_date,
+    sovlfos_majr_code,
+    sovlfos_term_code_ctlg,
+    sovlfos_term_code_end,
+    sovlfos_dept_code,
+    sovlfos_lfos_rule,
+    sovlfos_conc_attach_rule,
+    sovlfos_conc_attach_majr_code,
+    sovlfos_majr_code_attach,
+    sovlfos_start_date,
+    sovlfos_end_date,
+    sovlfos_tmst_code,
+    sovlfos_rolled_seqno,
+    sovlcur_curr_rule
+FROM
+    sovlfos
+    INNER JOIN sovlcur ON
+        sovlcur_pidm = sovlfos_pidm
+    AND
+        sovlcur_lmod_code = #[flowVars.curriculumModule]
+    AND
+        sovlcur_term_code = sovlfos_term_code
+    AND
+        sovlcur_key_seqno = #[flowVars.currKeySeqNo]
+    AND
+        sovlcur_seqno = sovlfos_lcur_seqno
+    AND
+        sovlcur_current_ind = 'Y'
+    AND
+        sovlcur_active_ind = 'Y'
+WHERE
+        sovlfos_pidm = #[flowVars.pidm]
+    AND
+        sovlfos_term_code = #[flowVars.fosTerm]
+    AND
+        sovlfos_current_ind = 'Y'
+    AND
+        sovlfos_active_ind = 'Y'
+    AND
+        sovlfos_lfst_code = 'CONCENTRATION']]></db:parameterized-query>
+            </db:select>
+            <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Check if a learner record exists as of the application term">
+                <db:parameterized-query><![CDATA[SELECT 'Y' stdn_check
+           FROM SGBSTDN
+          WHERE SGBSTDN.SGBSTDN_TERM_CODE_EFF =
+                (SELECT MAX(SGBSTDN_TERM_CODE_EFF) FROM SGBSTDN
+                  WHERE SGBSTDN_TERM_CODE_EFF >= #[flowVars.fosTerm]
+                    AND SGBSTDN_PIDM = #[flowVars.pidm])
+            AND SGBSTDN.SGBSTDN_PIDM = #[flowVars.pidm]]]></db:parameterized-query>
+            </db:select>
+        </scatter-gather>
+        <dw:transform-message doc:name="Transform Message to java and save in fosDelPayload variable">
+            <dw:set-variable variableName="fosPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+            <dw:set-variable variableName="fosDelPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.fosDelPayload[0].size() == 0]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Cannot delete concentration, record does not exist ']]" doc:name="Set Payload concentration not available"/>
+            </when>
+            <when expression="#[flowVars.fosDelPayload[0][0].sovlfos_majr_code != flowVars.fosOldConc]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Concetration code in the request does not match the field of study Concengtration']]" doc:name="Set Payload to False if the old concentration in the request does not match the current concentration in the Admissions curriculum"/>
+            </when>
+            <otherwise>
+                <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="Process delete concentrations">
+                    <db:parameterized-query><![CDATA[call BANINST1.SB_FIELDOFSTUDY.P_DELETE(
+    :P_PIDM,
+    :P_LCUR_SEQNO,
+    :P_SEQNO,
+    :P_ROWID
+  )]]></db:parameterized-query>
+                    <db:in-param name="P_PIDM" type="BIGINT" value="#[flowVars.pidm]"/>
+                    <db:in-param name="P_LCUR_SEQNO" type="INTEGER" value="#[flowVars.fosDelPayload[0][0].sovlfos_lcur_seqno]"/>
+                    <db:in-param name="P_SEQNO" type="INTEGER" value="#[flowVars.fosDelPayload[0][0].sovlfos_seqno]"/>
+                    <db:out-param name="P_ROWID" type="LONGVARCHAR"/>
+                </db:stored-procedure>
+            </otherwise>
+        </choice>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;deleteConcentrationsDBFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+        <choice-exception-strategy doc:name="Choice Exception Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(java.sql.SQLException)]" doc:name="Catch Exception Strategy">
+            <logger message="#[&quot;Exception Testing:&quot; + exception.cause]" level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[exception.message.contains(&quot;Delete Failed&quot;)]">
+                    <set-variable variableName="dbErrMessage" value="Delete failed. More than one row was found for the concetration." doc:name="dbErrMessage Delete Failed. Exactly one row must be deleted"/>
+                </when>
+                <when expression="#[exception.message.contains(&quot;Cannot delete field of study, record does not exist &quot;)]">
+                    <set-variable variableName="dbErrMessage" value="Cannot delete concentration, record does not exist " doc:name="dbErrMessage Cannot delete field of study, record does not exist "/>
+                </when>
+                <otherwise>
+                    <set-variable variableName="dbErrMessage" value="Banner Database Error" doc:name="dbErrMessage Catch All"/>
+                </otherwise>
+            </choice>
+            <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':flowVars.dbErrMessage]]" doc:name="Set exception payload"/>
+        </catch-exception-strategy>
+        </choice-exception-strategy>
+    </flow>
+</mule>

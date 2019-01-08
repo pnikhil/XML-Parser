@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <flow name="getApplicantsApplicationsFlow">
+        <set-variable variableName="flowName" value="getApplicantFlow" doc:name="Set flowName to getApplicantFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <flow-ref name="getPersonsFlow" doc:name="Get a person record for the UID"/>
+        <choice doc:name="Check that a PIDM has been returned">
+            <when expression="#[payload != empty]">
+                <set-variable variableName="personPayload" value="#[payload]" mimeType="application/java" doc:name="Set Person Payload"/>
+                <message-properties-transformer scope="invocation" doc:name="Set Message Properties for retrieving applicant data">
+                    <add-message-property key="pidm" value="#[flowVars.personPayload[0].pidm]"/>
+                    <add-message-property key="fromTerm" value="#[message.inboundProperties.'http.query.params'.fromEntryTerm]"/>
+                    <add-message-property key="applNo" value="#[message.inboundProperties.'http.query.params'.applicationNumber]"/>
+                    <add-message-property key="emailType" value="ADM"/>
+                    <add-message-property key="toTerm" value="#[message.inboundProperties.'http.query.params'.toEntryTerm]"/>
+                    <add-message-property key="codeGroup" value="ADMCHKLIST"/>
+                    <add-message-property key="internalCode" value="ADMTYPE"/>
+                </message-properties-transformer>
+                <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get applicant data">
+                    <db:parameterized-query><![CDATA[SELECT
+    saradap.saradap_pidm saradap_pidm,
+    saradap.saradap_term_code_entry saradap_term_code_entry,
+    saradap.saradap_appl_no saradap_appl_no,
+    saradap.saradap_levl_code saradap_levl_code,
+    stvlevl.stvlevl_desc stvlevl_desc,
+    saradap.saradap_appl_date saradap_appl_date,
+    saradap.saradap_apst_code saradap_apst_code,
+    stvapst.stvapst_desc stvapst_desc,
+    saradap.saradap_apst_date saradap_apst_date,
+    saradap.saradap_admt_code saradap_admt_code,
+    nvl(to_char(gtvsdax.gtvsdax_comments),stvadmt.stvadmt_desc) stvadmt_desc,
+    saradap.saradap_styp_code saradap_styp_code,
+    stvstyp.stvstyp_desc stvstyp_desc,
+    saradap.saradap_camp_code saradap_camp_code,
+    stvcamp.stvcamp_desc stvcamp_desc,
+    saradap.saradap_coll_code_1 saradap_coll_code_1,
+    stvcoll.stvcoll_desc stvcoll_desc,
+    saradap.saradap_degc_code_1 saradap_degc_code_1,
+    stvdegc.stvdegc_desc stvdegc_desc,
+    saradap.saradap_majr_code_1 saradap_majr_code_1,
+    stvmajr.stvmajr_desc stvmajr_desc,
+    saradap.saradap_resd_code saradap_resd_code,
+    stvresd.stvresd_desc stvresd_desc,
+    saradap.saradap_activity_date saradap_activity_date,
+    saradap.saradap_dept_code saradap_dept_code,
+    stvdept.stvdept_desc stvdept_desc,
+    d1.sarappd_apdc_date sarappd_apdc_date,
+    d1.sarappd_apdc_code sarappd_apdc_code,
+    stvapdc.stvapdc_desc stvapdc_desc,
+    saraatt.saraatt_atts_code saraatt_atts_code,
+    stvatts.stvatts_desc stvatts_desc
+FROM
+    saradap
+    JOIN sarappd d1 ON
+        d1.sarappd_pidm = saradap.saradap_pidm
+    AND
+        d1.sarappd_term_code_entry = saradap.saradap_term_code_entry
+    AND
+        d1.sarappd_appl_no = saradap.saradap_appl_no
+    AND
+        d1.sarappd_apdc_date = (
+            SELECT
+                MAX(d2.sarappd_apdc_date)
+            FROM
+                sarappd d2
+            WHERE
+                    d2.sarappd_pidm = d1.sarappd_pidm
+                AND
+                    d2.sarappd_term_code_entry = d1.sarappd_term_code_entry
+                AND
+                    d2.sarappd_appl_no = d1.sarappd_appl_no
+        )
+    JOIN stvstyp ON stvstyp.stvstyp_code = saradap.saradap_styp_code
+    JOIN stvcamp ON stvcamp.stvcamp_code = saradap.saradap_camp_code
+    JOIN stvresd ON stvresd.stvresd_code = saradap.saradap_resd_code
+    JOIN stvadmt ON stvadmt.stvadmt_code = saradap.saradap_admt_code
+    JOIN stvlevl ON stvlevl_code = saradap.saradap_levl_code
+    JOIN stvapst ON stvapst_code = saradap.saradap_apst_code
+    JOIN stvcoll ON stvcoll_code = saradap.saradap_coll_code_1
+    JOIN stvdegc ON stvdegc_code = saradap.saradap_degc_code_1
+    JOIN stvmajr ON stvmajr_code = saradap.saradap_majr_code_1
+    JOIN stvdept ON stvdept_code = saradap.saradap_dept_code
+    JOIN stvapdc ON stvapdc_code = d1.sarappd_apdc_code
+    LEFT OUTER JOIN saraatt ON
+        saraatt.saraatt_pidm = saradap.saradap_pidm
+    AND
+        saraatt.saraatt_term_code = saradap.saradap_term_code_entry
+    AND
+        saraatt.saraatt_appl_no = saradap.saradap_appl_no
+    JOIN stvatts ON stvatts_code = saraatt.saraatt_atts_code
+    LEFT OUTER JOIN gtvsdax ON
+         gtvsdax_internal_code_group = #[flowVars.codeGroup]
+    AND 
+         gtvsdax_internal_code = #[flowVars.internalCode]
+    AND 
+         gtvsdax_external_code = stvadmt.stvadmt_code
+WHERE
+        saradap.saradap_pidm =#[flowVars.pidm]
+    AND (
+        (
+                #[flowVars.fromTerm] IS NULL
+            AND
+                #[flowVars.toTerm] IS NULL
+        ) OR (
+            (
+                (
+                        #[flowVars.fromTerm] IS NOT NULL
+                    AND
+                        #[flowVars.toTerm] IS NULL
+                ) AND
+                    saradap.saradap_term_code_entry >=#[flowVars.fromTerm]
+            ) OR (
+                (
+                    (
+                            #[flowVars.fromTerm] IS NULL
+                        AND
+                            #[flowVars.toTerm] IS NOT NULL
+                    ) AND
+                        saradap.saradap_term_code_entry <=#[flowVars.toTerm]
+                )
+            ) OR (
+                    #[flowVars.fromTerm]  IS NOT NULL
+                AND
+                    #[flowVars.toTerm] IS NOT NULL
+                AND
+                    saradap.saradap_term_code_entry BETWEEN #[flowVars.fromTerm]  AND #[flowVars.toTerm]
+            )
+        )
+    ) AND (
+            #[flowVars.applNo] IS NULL
+        OR (
+                #[flowVars.applNo] IS NOT NULL
+            AND
+                saradap.saradap_appl_no =#[flowVars.applNo]
+        )
+    )]]></db:parameterized-query>
+                </db:select>
+                <dw:transform-message doc:name="Transform payload">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+
+{
+  responseCode: 0,
+  responseMessage: "Data retrieved successfully",
+  data: 
+    {
+      usfId: flowVars.personPayload[0].id,
+  	  firstName: flowVars.personPayload[0].fName,
+  	  lastName: flowVars.personPayload[0].lName,
+  	  middleName: flowVars.personPayload[0].mi,
+  	  citizenCode: flowVars.personPayload[0].citzenCode,
+  	  email: "",
+  	  applications:(payload groupBy $.saradap_term_code_entry orderBy $$) [-1..0] map using (terms=$[0]) 
+        {
+  	      entryterm: terms.saradap_term_code_entry,
+  	      applicationNumber: terms.saradap_appl_no,
+  	      level: terms.saradap_levl_code,
+  	      levelDescription: terms.stvlevl_desc,
+  	      appliedDate: terms.saradap_appl_date,
+  	      campus: terms.saradap_camp_code,
+  	      campusDescription: terms.stvcamp_desc,
+  	      residency: terms.saradap_resd_code,
+  	      residencyDescription: terms.stvresd_desc,
+  	      admitType: terms.saradap_admt_code,
+  	      admitTypeDescription: terms.stvadmt_desc,
+  	      studentType: terms.saradap_styp_code,
+  	      studentTypeDescription: terms.stvstyp_desc,
+  	      status: terms.saradap_apst_code,
+  	      statusDescription: terms.stvapst_desc,
+  	      decision: terms.sarappd_apdc_code,
+  	      decisionDescription: terms.stvapdc_desc,
+  	      decisionDate: terms.sarappd_apdc_date,
+  	      friendlyStatusDescription: "",
+  	      attributes: ($ map ((attr, indexOfAttr) -> { 
+  		    code: attr.saraatt_atts_code,
+  		    description: attr.stvatts_desc
+  	      })) when $.saraatt_atts_code?
+  	      otherwise [],
+  	      curriculums: {
+  	      	primary: {
+  	      		college: terms.saradap_coll_code_1,
+  	      		collegeDescription: terms.stvcoll_desc,
+  	      		degree: terms.saradap_degc_code_1,
+  	      		degreeDescription: terms.stvdegc_desc,
+  	      		major: terms.saradap_majr_code_1,
+  	      		majorDescription: terms.stvmajr_desc,
+  	      	    department: terms.saradap_dept_code,
+  	      	    departmentDescription: terms.stvdept_desc
+  	      	}
+  	      }
+  	    }
+    },
+  errors: []
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <enricher source="#[flowVars.emailTypePayload[0].EMAIL]" target="#[payload.data.email]" doc:name="Message Enricher">
+                    <flow-ref name="emailSub_Flow" doc:name="Enrich with ADM type email"/>
+                </enricher>
+                <dw:transform-message doc:name="Transform Message to JSON">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform payload and capture the person doesnt exist">
+                    <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": -1,
+	"responseMessage": "Data retrieved successfully",
+	"data": [],
+	"errors":[{
+		message: "Person not found."
+	}]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </flow>
+    
+
+</mule>

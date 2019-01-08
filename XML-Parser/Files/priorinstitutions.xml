@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="getPriorinstitutionsFlow">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows == empty?'10':message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow == empty ?'1':message.inboundProperties.'http.query.params'.initRow]"/>
+        </message-properties-transformer>
+        <set-variable variableName="flowName" value="getPriorinstitutionsFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <set-variable variableName="person" value="#[payload]" doc:name="setPerson"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Prior Institutions">
+            <db:parameterized-query><![CDATA[select * from 
+(select ROWNUM rn, a.* from
+(select 
+ count(*) over() total_records,
+  sd.SORDEGR_PIDM,
+  sd.SORDEGR_SBGI_CODE "institutionCode",
+  sb.STVSBGI_DESC "institutionDescription",
+  sdc.STVDEGC_DESC "degreeType",
+  sd.SORDEGR_DEGC_CODE "degreeCode",
+  sd.SORDEGR_GPA_TRANSFERRED "transferGpa",
+  sd.SORDEGR_ATTEND_FROM "attendedFrom",
+  sd.SORDEGR_ATTEND_TO "attendedTo",
+  sd.SORDEGR_DEGC_DATE "degreeDate",
+  sd.SORDEGR_PRIMARY_IND "primaryIndicator",
+  sd.SORDEGR_HOURS_TRANSFERRED "transferHours",
+  sp.sorpcol_official_trans "isOfficial",
+  sp.sorpcol_trans_recv_date "transcriptReceivedDate"
+  from SORDEGR sd
+  LEFT OUTER JOIN STVSBGI sb
+    on sd.SORDEGR_SBGI_CODE = sb.STVSBGI_CODE
+  LEFT OUTER JOIN STVDEGC sdc
+    on sd.SORDEGR_DEGC_CODE = sdc.STVDEGC_CODE
+  LEFT OUTER JOIN SORPCOL sp
+    on (sd.SORDEGR_PIDM = sp.SORPCOL_PIDM
+      and sd.SORDEGR_SBGI_CODE = sp.SORPCOL_SBGI_CODE)
+  where sd.SORDEGR_PIDM = #[flowVars.person[0].PIDM]
+  order by sp.sorpcol_trans_recv_date desc
+) a)
+where rn >= #[flowVars.initRow] and 
+rn <= (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Convert to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	totalRecords: $.TOTAL_RECORDS,
+	pidm: $.SORDEGR_PIDM,
+	institutionCode: $.institutionCode,
+	institutionDescription: $.institutionDescription,
+	degreeType: $.degreeType,
+	degreeCode: $.degreeCode,
+	transferGpa: $.transferGpa,
+	attendedFrom: $.attendedFrom,
+	attendedTo: $.attendedTo,
+	degreeDate: $.degreeDate,
+	primaryIndicator: $.primaryIndicator,
+	transferHours: $.transferHours,
+	isOfficial: $.isOffcial,
+	transcriptReceivedDate: $.transcriptReceivedDate
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getPriorinstitutionsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getPriorinstitutionsJSONFlow">
+        <set-variable variableName="flowName" value="getPriorinstitutionsJSONFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <flow-ref name="getPriorinstitutionsFlow" doc:name="getPriorinstitutionsFlow"/>
+        <dw:transform-message doc:name="Convert to Json">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"totalRecords": payload[0].totalRecords,
+	"data":[{
+		firstName: flowVars.person[0].fName,
+		middleInitial: flowVars.person[0].mi,
+		lastName: flowVars.person[0].lName,
+		usfId: flowVars.person[0].id,
+		priorInstitutions: payload map ((prior , indexOfPrior) -> {
+		institutionCode: prior.institutionCode,
+		institutionDescription: prior.institutionDescription,
+		degreeType: prior.degreeType,
+		degreeCode: prior.degreeCode,
+		transferGpa: prior.transferGpa,
+		attendedFrom: prior.attendedFrom,
+		attendedTo: prior.attendedTo,
+		degreeDate: prior.degreeDate,
+		primaryIndicator: prior.primaryIndicator,
+		transferHours: prior.transferHours,
+		isOfficial: prior.isOfficial,
+		transcriptReceivedDate: prior.transcriptReceivedDate
+			})}],
+	"errors":[]
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+</mule>

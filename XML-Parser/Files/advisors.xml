@@ -1,0 +1,874 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+    <flow name="getDynamicQuery">
+      <set-variable variableName="flowName" value="getDynamicQuery" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <flow-ref name="getCurrentTermFlow" doc:name="getCurrentTermFlow"/>
+        <scripting:transformer doc:name="build get advisors relations dynamic query">
+            <scripting:script engine="Groovy" file="groovyScripts/getRelationsDynamicQuery.groovy"/>
+        </scripting:transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Database">
+            <db:dynamic-query><![CDATA[#[payload]]]></db:dynamic-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform payload to JSON">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;Advisors-getDynamicQuery&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getAdvisorsInfoFlow">
+      <set-variable variableName="flowName" value="getAdvisorsInfoFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <set-payload doc:name="Set Payload" value="null"/>
+    </flow>
+    <flow name="getStudentsPerAdvisorFlow">
+      <set-variable variableName="flowName" value="getStudentsPerAdvisorFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+           <message-properties-transformer scope="invocation" doc:name="Capture Message Properties">
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="sortField" value="#[message.inboundProperties.'http.query.params'.sortField]"/>
+            <add-message-property key="sortAscending" value="#[message.inboundProperties.'http.query.params'.sortAscending]"/>
+            <add-message-property key="cohortCode" value="#[message.inboundProperties.'http.query.params'.cohortCode!=empty?message.inboundProperties.'http.query.params'.cohortCode:'']"/>
+            <add-message-property key="status" value="#[message.inboundProperties.'http.query.params'.activeStatus!=empty?message.inboundProperties.'http.query.params'.activeStatus:'']"/>
+            <add-message-property key="degreeStatus" value="#[message.inboundProperties.'http.query.params'.stuDegreeStatus!=empty?message.inboundProperties.'http.query.params'.stuDegreeStatus:'']"/>
+            <add-message-property key="hasFifPlan" value="#[message.inboundProperties.'http.query.params'.hasFinishFourPlan]"/>
+            <add-message-property key="isDeceased" value="#[message.inboundProperties.'http.query.params'.isDeceased!=empty?message.inboundProperties.'http.query.params'.isDeceased:'']"/>
+            <add-message-property key="campus" value="#[message.inboundProperties.'http.query.params'.campus!=empty?message.inboundProperties.'http.query.params'.campus:'']"/>
+            <add-message-property key="graduatingTerm" value="#[message.inboundProperties.'http.query.params'.graduatingTerm!=empty?message.inboundProperties.'http.query.params'.graduatingTerm:'']"/>
+            <add-message-property key="hasGraduated" value="#[message.inboundProperties.'http.query.params'.hasGraduated!=empty?message.inboundProperties.'http.query.params'.hasGraduated:'']"/>
+            <add-message-property key="scholarshipStatus" value="#[message.inboundProperties.'http.query.params'.scholarshipStatus!=empty?message.inboundProperties.'http.query.params'.scholarshipStatus:'']"/>
+            <add-message-property key="yearsToGrad" value="#[message.inboundProperties.'http.query.params'.potentialYearsToGrad!=empty?java.net.URLEncoder.encode(message.inboundProperties['http.query.params'].potentialYearsToGrad,&quot;UTF-8&quot;):'']"/>
+            <add-message-property key="preCertifiedStatusCode" value="#[message.inboundProperties.'http.query.params'.preCertifiedStatus!=empty?message.inboundProperties.'http.query.params'.preCertifiedStatus:'']"/>
+            <add-message-property key="degreePlanCode" value="#[message.inboundProperties.'http.query.params'.stuDegreePlanCode]"/>
+            <add-message-property key="isNotReturning" value="#[message.inboundProperties.'http.query.params'.isNotReturning]"/>
+            <add-message-property key="collegeCode" value="#[message.inboundProperties.'http.query.params'.collegeCode!=empty?message.inboundProperties.'http.query.params'.collegeCode:'']"/>
+            <add-message-property key="instMaxGPA" value="#[message.inboundProperties.'http.query.params'.instMaxGPA!=empty?message.inboundProperties.'http.query.params'.instMaxGPA:'']"/>
+            <add-message-property key="excessHours" value="#[message.inboundProperties.'http.query.params'.excessHours!=empty?message.inboundProperties.'http.query.params'.excessHours:'']"/>
+            <add-message-property key="academicStanding" value="#[message.inboundProperties.'http.query.params'.academicStanding!=empty?message.inboundProperties.'http.query.params'.academicStanding:'']"/>
+            <add-message-property key="admitTerm" value="#[message.inboundProperties.'http.query.params'.admitTerm!=empty?message.inboundProperties.'http.query.params'.admitTerm:'']"/>
+            <add-message-property key="attribute" value="#[message.inboundProperties.'http.query.params'.attribute!=empty?message.inboundProperties.'http.query.params'.attribute:'']"/>
+            <add-message-property key="instMinGPA" value="#[message.inboundProperties.'http.query.params'.instMinGPA!=empty?message.inboundProperties.'http.query.params'.instMinGPA:'']"/>
+            <add-message-property key="residenceHall" value="#[message.inboundProperties.'http.query.params'.residenceHall!=empty?message.inboundProperties.'http.query.params'.residenceHall:'']"/>
+            <add-message-property key="admitType" value="#[message.inboundProperties.'http.query.params'.admitType!=empty?message.inboundProperties.'http.query.params'.admitType:'']"/>
+            <add-message-property key="majorCode" value="#[message.inboundProperties.'http.query.params'.majorCode!=empty?message.inboundProperties.'http.query.params'.majorCode:'']"/>
+            <add-message-property key="currRegisteredHours" value="#[message.inboundProperties.'http.query.params'.currRegisteredHours!=empty?message.inboundProperties.'http.query.params'.currRegisteredHours:'']"/>
+            <add-message-property key="isRegisteredNextTerm" value="#[message.inboundProperties.'http.query.params'.isRegisteredNextTerm!=empty?message.inboundProperties.'http.query.params'.isRegisteredNextTerm:'']"/>
+            <add-message-property key="firstName" value="#[message.inboundProperties.'http.query.params'.firstName!=empty?message.inboundProperties.'http.query.params'.firstName.toUpperCase():'']"/>
+            <add-message-property key="lastName" value="#[message.inboundProperties.'http.query.params'.lastName!=empty?message.inboundProperties.'http.query.params'.lastName.toUpperCase():'']"/>
+            <add-message-property key="levelCode" value="#[message.inboundProperties.'http.query.params'.level!=empty?message.inboundProperties.'http.query.params'.level:'']"/>
+            <add-message-property key="currentOnly" value="#[message.inboundProperties.'http.query.params'.currentOnly]"/>
+            <add-message-property key="usfID" value="#[message.inboundProperties.'http.query.params'.usfId]"/>
+            <add-message-property key="relationCode" value="#[message.inboundProperties.'http.query.params'.relationCode]"/>
+        </message-properties-transformer>
+        <logger message="currentonly is #[flowVars.currentOnly]" level="INFO" doc:name="Logger"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Student details ">
+            <db:parameterized-query><![CDATA[select * from (SELECT /*+ first_rows(10) */
+    a.*, rownum rnum
+FROM
+    (
+        WITH       
+        srchstudents AS (
+           SELECT DISTINCT
+                spriden_first_name,
+                spriden_last_name,
+                spriden_id,
+                sgbstdn_camp_code
+             FROM
+                eai.allstudents_mv
+                INNER JOIN  eai_sgradvr r  ON 
+                (sgradvr_pidm = sgbstdn_pidm)
+                INNER JOIN stvadvr ON 
+                (sgradvr_advr_code = stvadvr_code)
+                                           
+            WHERE  sgradvr_advr_pidm = (select spriden_pidm from spriden where spriden_id=#[flowVars.advisorId] and spriden_change_ind is null)
+            
+            AND    sgradvr_active_ind = 'A'
+            
+            AND (
+                 #[flowVars.currentOnly] IS NULL 
+                 
+                 OR
+                 
+                  sgradvr_active_ind = 'A'
+                )
+               
+             AND   (
+                        #[flowVars.usfID] IS NULL
+                    OR
+                        spriden_id = #[flowVars.usfID]
+                  ) AND (
+                        #[flowVars.relationCode] IS NULL
+                    OR
+                        sgradvr_advr_code = #[flowVars.relationCode]
+                 ) AND  (
+                        #[flowVars.firstName] IS NULL
+                    OR
+                        spriden_search_first_name = #[flowVars.firstName]
+                ) AND (
+                        #[flowVars.lastName] IS NULL
+                    OR
+                        spriden_search_last_name = #[flowVars.lastName]
+                ) AND (
+                        #[flowVars.cohortCode] IS NULL
+                    OR
+                        chrtcode = #[flowVars.cohortCode]
+                ) AND (
+                        #[flowVars.campus] IS NULL
+                    OR
+                        sgbstdn_camp_code = #[flowVars.campus]
+                ) AND (
+                        #[flowVars.status] IS NULL
+                    OR
+                        sgbstdn_stst_code = #[flowVars.status]
+                ) AND (
+                        #[flowVars.collegeCode] IS NULL
+                    OR (
+                            sgbstdn_coll_code_1 = #[flowVars.collegeCode]
+                        OR
+                            sgbstdn_coll_code_2 = #[flowVars.collegeCode]
+                    )
+                ) AND (
+                        #[flowVars.majorCode] IS NULL
+                    OR (
+                            sgbstdn_majr_code_1 = #[flowVars.majorCode]
+                        OR
+                            sgbstdn_majr_code_2 = #[flowVars.majorCode]
+                    )
+                ) AND (
+                        #[flowVars.graduatingTerm] IS NULL
+                    OR
+                        anticipatedgradterm = #[flowVars.graduatingTerm]
+                ) AND (
+                        #[flowVars.hasFifPlan] IS NULL
+                    OR (
+                                (
+                                        #[flowVars.hasFifPlan] = 0
+                                    AND (
+                                            hasfifgradplan IS NULL
+                                        OR
+                                            hasfifgradplan = #[flowVars.hasFifPlan]
+                                    )
+                                ) OR
+                                    hasfifgradplan = #[flowVars.hasFifPlan]
+                            )
+                ) AND (
+                        #[flowVars.scholarshipStatus] IS NULL
+                    OR
+                        scholarshipstatus = #[flowVars.scholarshipStatus]
+                ) AND (
+                        #[flowVars.yearsToGrad] IS NULL
+                    OR
+                        potentialyeartograd = #[flowVars.yearsToGrad]
+                ) AND (
+                        #[flowVars.hasGraduated] IS NULL
+                    OR
+                        hasbachelorsdeg = #[flowVars.hasGraduated]
+                ) AND (
+                        #[flowVars.preCertifiedStatusCode] IS NULL
+                    OR
+                        precertificationstatus = #[flowVars.preCertifiedStatusCode]
+                ) AND (
+                        #[flowVars.isNotReturning] IS NULL
+                    OR
+                        isstudentnotreturning = #[flowVars.isNotReturning]
+                ) AND (
+                        #[flowVars.degreeStatus] IS NULL
+                    OR
+                        currtermdegstatus = #[flowVars.degreeStatus]
+                ) AND (
+                        #[flowVars.isDeceased] IS NULL
+                    OR (
+                                (
+                                        #[flowVars.isDeceased] = 'N'
+                                    AND
+                                        spbpers_dead_ind IS NULL
+                                ) OR
+                                    spbpers_dead_ind = #[flowVars.isDeceased]
+                            )
+                ) AND (
+                        #[flowVars.levelCode] IS NULL
+                    OR
+                        sgbstdn_levl_code = #[flowVars.levelCode]
+                ) AND (
+                        #[flowVars.residenceHall] IS NULL
+                    OR
+                        residencehall LIKE '%' || #[flowVars.residenceHall] || '%'
+                ) AND (
+                        #[flowVars.currRegisteredHours] IS NULL
+                    OR
+                        currregisteredhrs = #[flowVars.currRegisteredHours]
+                ) AND (
+                        #[flowVars.isRegisteredNextTerm] IS NULL
+                    OR
+                        regnextterm = #[flowVars.isRegisteredNextTerm]
+                ) AND (
+                        #[flowVars.academicStanding] IS NULL
+                    OR
+                        SHRTTRM_ASTD_CODE_END_OF_TERM = #[flowVars.academicStanding]
+                ) AND (
+                        #[flowVars.excessHours] IS NULL
+                    OR
+                        excesshrs = #[flowVars.excessHours]
+                ) AND (
+                        #[flowVars.attribute] IS NULL
+                    OR
+                        attrs = #[flowVars.attribute]
+                ) AND (
+                        #[flowVars.admitType] IS NULL
+                    OR
+                        sgbstdn_admt_code = #[flowVars.admitType]
+                ) AND (
+                        #[flowVars.admitTerm] IS NULL
+                    OR
+                        sgbstdn_term_code_admit = #[flowVars.admitTerm]
+                ) AND (
+                    (
+                            #[flowVars.instMinGPA] IS NULL
+                        AND
+                            #[flowVars.instMaxGPA] IS NULL
+                    ) OR (
+                        (
+                            (
+                                    #[flowVars.instMinGPA] IS NOT NULL
+                                AND
+                                    #[flowVars.instMaxGPA] IS NULL
+                            ) AND
+                                usfgpa >= #[flowVars.instMinGPA]
+                        ) OR (
+                            (
+                                (
+                                        #[flowVars.instMinGPA] IS NULL
+                                    AND
+                                        #[flowVars.instMaxGPA] IS NOT NULL
+                                ) AND
+                                    usfgpa <= #[flowVars.instMaxGPA]
+                            )
+                        ) OR (
+                                #[flowVars.instMinGPA] IS NOT NULL
+                            AND
+                                #[flowVars.instMaxGPA] IS NOT NULL
+                            AND
+                                usfgpa BETWEEN #[flowVars.instMinGPA] AND #[flowVars.instMaxGPA]
+                        )
+                    )
+                )
+        ) SELECT
+            COUNT(*) OVER() totalrecords,
+            srchstudents.*
+        FROM
+            srchstudents
+        ORDER BY
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'firstName'
+                    AND
+                        #[flowVars.sortAscending] = 'true'
+                    THEN spriden_first_name
+                END
+            ASC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'firstName'
+                    AND
+                        #[flowVars.sortAscending] = 'false'
+                    THEN spriden_first_name
+                END
+            DESC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'lastName'
+                    AND
+                        #[flowVars.sortAscending] = 'true'
+                    THEN spriden_last_name
+                END
+            ASC,
+                CASE
+                    WHEN
+                        #[flowVars.sortField] = 'lastName'
+                    AND
+                        #[flowVars.sortAscending] = 'false'
+                    THEN spriden_last_name
+                END
+            DESC
+    ) a) b
+where rnum between #[flowVars.initRow] and (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var campusDescription = {'T':'Tampa','P':'St. Petersburg','S':'Sarasota-Manatee','F':'Fort Myers',
+	                      'N':'New College','L':'Lakeland','M':'Medicine','1':'Off-campus - Tampa',
+	                      '2':'Off-campus - Lakeland','3':'Off-campus - Sarasota','4':'Off-campus - St. Petersburg',
+	                      '5':'Off-campus - Fort Myers','0':'Telecourse  - Ft. Myers','6':'Telecourse - St. Petersburg',
+	                      '7':'Telecourse - Sarasota','8':'Telecourse - Lakeland','9':'Telecourse - Tampa',
+	                      'C':'Off Campus Special Programs'}
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload[0].TOTALRECORDS,
+	"data": payload map ((student) -> {
+		"usfId" : student.SPRIDEN_ID,
+		"firstName" : student.SPRIDEN_FIRST_NAME,
+		"lastName" : student.SPRIDEN_LAST_NAME,
+		"campus" : campusDescription[student.SGBSTDN_CAMP_CODE]
+	}),
+	"errors":[]
+
+	}
+
+	]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+
+    <flow name="getAllStudentAdvisorsRelationsFlow">
+      <set-variable variableName="flowName" value="getAllStudentAdvisorsRelationsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Set Student Advisors Parameters">
+            <add-message-property key="currentOnly" value="#[message.inboundProperties.'http.query.params'.currentOnly]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.query.params'.usfId]"/>
+            <add-message-property key="advisorId" value="#[message.inboundProperties.'http.query.params'.advisorId]"/>
+            <add-message-property key="relationCode" value="#[message.inboundProperties.'http.query.params'.relationCode]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="sortField" value="#[message.inboundProperties.'http.query.params'.sortField]"/>
+            <add-message-property key="sortAscending" value="#[message.inboundProperties.'http.query.params'.sortAscending]"/>
+            <add-message-property key="studentFirstName" value="#[message.inboundProperties.'http.query.params'.studentFirstName!=empty?message.inboundProperties.'http.query.params'.studentFirstName:'']"/>
+            <add-message-property key="studentLastName" value="#[message.inboundProperties.'http.query.params'.studentLastName!=empty?message.inboundProperties.'http.query.params'.studentLastName:'']"/>
+            <add-message-property key="cohort" value="#[message.inboundProperties.'http.query.params'.cohort!=empty?message.inboundProperties.'http.query.params'.cohort:'']"/>
+            <add-message-property key="registeredNextTerm" value="#[message.inboundProperties.'http.query.params'.stuRegisteredNextTerm]"/>
+            <add-message-property key="holdType" value="#[message.inboundProperties.'http.query.params'.holdType]"/>
+            <add-message-property key="academicStanding" value="#[message.inboundProperties.'http.query.params'.academicStanding]"/>
+            <add-message-property key="level" value="#[message.inboundProperties.'http.query.params'.level!=empty?message.inboundProperties.'http.query.params'.level:'']"/>
+            <add-message-property key="status" value="#[message.inboundProperties.'http.query.params'.activeStatus!=empty?message.inboundProperties.'http.query.params'.activeStatus:'']"/>
+            <add-message-property key="collegeCode2" value="#[message.inboundProperties.'http.query.params'.collegeCode2!=empty?message.inboundProperties.'http.query.params'.collegeCode2:'']"/>
+            <add-message-property key="degreeStatus" value="#[message.inboundProperties.'http.query.params'.stuDegreeStatus!=empty?message.inboundProperties.'http.query.params'.stuDegreeStatus:'']"/>
+            <add-message-property key="hasFifPlan" value="#[message.inboundProperties.'http.query.params'.hasFinishFourPlan!=empty?message.inboundProperties.'http.query.params'.hasFinishFourPlan:'']"/>
+            <add-message-property key="majorCode2" value="#[message.inboundProperties.'http.query.params'.majorCode2!=empty?message.inboundProperties.'http.query.params'.majorCode2:'']"/>
+            <add-message-property key="campus" value="#[message.inboundProperties.'http.query.params'.campus!=empty?message.inboundProperties.'http.query.params'.campus:'']"/>
+            <add-message-property key="collegeCode1" value="#[message.inboundProperties.'http.query.params'.collegeCode1!=empty?message.inboundProperties.'http.query.params'.collegeCode1:'']"/>
+            <add-message-property key="majorCode1" value="#[message.inboundProperties.'http.query.params'.majorCode1!=empty?message.inboundProperties.'http.query.params'.majorCode1:'']"/>
+            <add-message-property key="graduatingTerm" value="#[message.inboundProperties.'http.query.params'.graduatingTerm != empty? message.inboundProperties.'http.query.params'.graduatingTerm:'']"/>
+            <add-message-property key="hasGraduated" value="#[message.inboundProperties.'http.query.params'.hasGraduated != empty? message.inboundProperties.'http.query.params'.hasGraduated:'']"/>
+            <add-message-property key="scholarshipStatus" value="#[message.inboundProperties.'http.query.params'.scholarshipStatus != empty? message.inboundProperties.'http.query.params'.scholarshipStatus:'']"/>
+            <add-message-property key="yearsToGrad" value="#[message.inboundProperties.'http.query.params'.potentialYearsToGrad != empty? message.inboundProperties.'http.query.params'.potentialYearsToGrad:'']"/>
+            <add-message-property key="preCertifiedStatusCode" value="#[message.inboundProperties.'http.query.params'.preCertifiedStatus != empty? message.inboundProperties.'http.query.params'.preCertifiedStatus:'']"/>
+            <add-message-property key="degreePlanCode" value="#[message.inboundProperties.'http.query.params'.stuDegreePlanCode]"/>
+            <add-message-property key="isNotReturning" value="#[message.inboundProperties.'http.query.params'.isNotReturning]"/>
+        </message-properties-transformer>
+        <set-variable variableName="advisorDetails" value="true" doc:name="advisorDetails"/>
+        <flow-ref name="getDynamicQuery" doc:name="getDynamicQuery"/>
+           <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:dwScripts/buildGetAdvisorsResponse.dwl"/>
+     </dw:transform-message>
+
+    </flow>
+    <flow name="postAdvisorsFlow">
+      <set-variable variableName="flowName" value="postAdvisorsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="userId" value="MULESOFT" doc:name="User Id Variable"/>
+        <set-variable variableName="allErrors" value="#[[]]" doc:name="Hold all Errors Variable"/>
+        <foreach doc:name="For Each">
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="Database">
+                <db:parameterized-query><![CDATA[call baninst1.wsak_advising.p_create_relations(:p_advisorUId, :p_studentUId, :p_relationCode, :p_activeInd, :p_term,  :p_userId, :p_status, :p_message)]]></db:parameterized-query>
+                <db:in-param name="p_advisorUId" value="#[payload.advisorUId]"/>
+                <db:in-param name="p_studentUId" value="#[payload.studentUId]"/>
+                <db:in-param name="p_relationCode" value="#[payload.relationCode]"/>
+                <db:in-param name="p_activeInd" value="#[payload.isActive]"/>
+                <db:in-param name="p_term" value="#[payload.termEffective ]"/>
+                <db:in-param name="p_userId" value="#[flowVars.userId]"/>
+                <db:out-param name="p_status" type="NUMERIC"/>
+                <db:out-param name="p_message" type="VARCHAR"/>
+            </db:stored-procedure>
+            <expression-transformer expression="#[flowVars.allErrors.add(payload.p_message)]" doc:name="Expression"/>
+        </foreach>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:dwScripts/buildPostAdvisorsResponse.dwl"/>
+
+        </dw:transform-message>
+    </flow>
+    <flow name="getAdvisorsStudentTrackingPidmFlow">
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="Set pidm"/>
+        <flow-ref name="getAdvisorsStudentTrackingFlow" doc:name="getAdvisorsStudentTrackingFlow"/>
+    </flow>
+    <flow name="getAdvisorsStudentTrackingFlow">
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get student tracking flags">
+            <db:parameterized-query><![CDATA[select (select spriden_id from spriden where spriden_pidm = pidm and spriden_change_ind is null) usfId ,
+SCHOLARSHIPSTATUS ,
+SCHOLARSHIPSTATUSUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = SCHOLARSHIPSTATUSUPDATEBY and spriden_change_ind is null) SCHSTATUSUPDATEBY_ID ,
+POTENTIALYEARTOGRAD ,
+POTENTIALYEARTOGRADUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = POTENTIALYEARTOGRADUPDATEBY and spriden_change_ind is null) POTENYRTOGRADUPDATEBY_ID ,
+PRECERTIFICATIONSTATUS ,
+PRECERTIFICATIONSTATUSUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = PRECERTIFICATIONSTATUSUPDATEBY and spriden_change_ind is null) PRECERTSTATUSUPDATEBY_ID ,
+ANTICIPATEDGRADTERM ,
+ANTICIPATEDGRADTERMUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = ANTICIPATEDGRADTERMUPDATEBY and spriden_change_ind is null) ANTGRADTERMUPDATEBY_ID ,
+HOURSLEFTTOGRADUATE ,
+HOURSLEFTTOGRADUATEUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = HOURSLEFTTOGRADUATEUPDATEBY and spriden_change_ind is null) HRSLEFTTOGRADUPDATEBY_ID ,
+ISSTUDENTNOTRETURNING ,
+ISSTUDENTNOTRETURNINGUPDATEON ,
+(select spriden_id from spriden where spriden_pidm = ISSTUDENTNOTRETURNINGUPDATEBY and spriden_change_ind is null) STDNNOTRETUPDATEBY_ID,
+HASFIFGRADPLAN  
+from advisor_trackstudent
+where PIDM = #[flowVars.pidm]]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="studentTracking" value="#[payload]" mimeType="application/java" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var main= flowVars.studentTracking
+---
+
+{
+	"usfId": main.usfId,
+    "flags" : flowVars.studentTracking map ((flags, indexOfflags) -> {
+
+		    "scholarshipStatus" : flags.SCHOLARSHIPSTATUS,
+		    "potentialYearsToGrad" : flags.POTENTIALYEARTOGRAD,
+		    "preCertificationStatus": flags.PRECERTIFICATIONSTATUS,
+		    "anticipatedGraduationTerm": flags.ANTICIPATEDGRADTERM,
+		    "hoursLeftToGraduate": flags.HOURSLEFTTOGRADUATE,
+		    "isStudentIndicatedNotReturning": flags.ISSTUDENTNOTRETURNING,
+		    "hasFifGradPlan": flags.HASFIFGRADPLAN
+
+	}),
+	"audits" : flowVars.studentTracking map ((audits, indexOfaudits) -> {
+		"scholarshipStatusUpdateOn": audits.SCHOLARSHIPSTATUSUPDATEON,
+		"scholarshipStatusUpdateBy": audits.SCHSTATUSUPDATEBY_ID,
+		"potentialYearsToGradUpdateOn": audits.POTENTIALYEARTOGRADUPDATEON,
+		"potentialYearsToGradUpdateBy": audits.POTENYRTOGRADUPDATEBY_ID,
+		"preCertificationStatusUpdateOn": audits.PRECERTIFICATIONSTATUSUPDATEON,
+		"preCertificationStatusUpdateBy": audits.PRECERTSTATUSUPDATEBY_ID,
+		"anticipatedGraduationTermOn": audits.ANTICIPATEDGRADTERMUPDATEON,
+		"anticipatedGraduationTermBy": audits.ANTGRADTERMUPDATEBY_ID,
+		"hoursLeftToGraduateOn": audits.HOURSLEFTTOGRADUATEUPDATEON,
+		"hoursLeftToGraduateBy": audits.HRSLEFTTOGRADUPDATEBY_ID,
+		"isStudentIndicatedNotReturningOn": audits.ISSTUDENTNOTRETURNINGUPDATEON,
+		"isStudentIndicatedNotReturningBy": audits.STDNNOTRETUPDATEBY_ID
+	})
+
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getAdvisorsStudentTrackingResourceFlow">
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Route message based on a PIDM found">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="#[['message':'Invalid USF ID.']]" doc:name="Set payload to invalid usf Id"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": -1,
+	"responseMessage": "Data retrieved successfully",
+	"data": [],
+	"errors":[payload.message]
+
+	}
+
+]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <set-variable variableName="pidm" value="#[payload[0].pidm]" doc:name="set PIDM"/>
+                <flow-ref name="getAdvisorsStudentTrackingFlow" doc:name="getAdvisorsStudentTrackingFlow"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var flagsData=payload.flags
+%var auditData=payload.audits
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data":{ 
+		"usfId": payload.usfId[0],
+		"flags": flagsData[0],
+		"audits": auditData[0]
+	},
+	"errors":[]
+
+	}
+
+]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="postAdvisorsStudentTrackingResourceFlow">
+        <flow-ref name="postAdvisorsStudentTrackingFlow" doc:name="postAdvisorsStudentTrackingFlow"/>
+        <dw:transform-message doc:name="Transform  Message to JSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"status": (flowVars.trackingResponsePayload.status == 'S'),
+	"message": flowVars.trackingResponsePayload.message
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="postAdvisorsStudentTrackingFlow">
+        <set-variable variableName="originalPayload" value="#[payload]" mimeType="application/json" doc:name="Set the main payload"/>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="#[['status':'F', 'message':'Invalid USF ID.']]" doc:name="Set Payload to Invalid usfId"/>
+                <flow-ref name="convertToJavaAndTrackingFlow" doc:name="convertToJavaAndTrackingFlow"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="pidm" value="#[payload[0].pidm]" doc:name="Set PIDM"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-variable variableName="studentTracking"><![CDATA[%dw 1.0
+%output application/java
+%var convPayload=flowVars.originalPayload
+---
+{
+	"pidm": flowVars.pidm,
+	"scholarshipStatus": convPayload.scholarshipStatus,
+	"potentialYearsToGrad": convPayload.potentialYearsToGrad,
+	"preCertificationStatus": convPayload.preCertificationStatus,
+	"anticipatedGraduationTerm": convPayload.anticipatedGraduationTerm,
+	"hoursLeftToGraduate": convPayload.hoursLeftToGraduate,
+	"isStudentIndicatedNotReturning": convPayload.isStudentIndicatedNotReturning,
+	"scholarshipStatusUpdateOn": convPayload.scholarshipStatusUpdateOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.scholarshipStatusUpdateOn != null
+	                             otherwise null,
+    "scholarshipStatusUpdateBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.scholarshipStatusUpdateBy})[0].pidm) when convPayload.scholarshipStatusUpdateBy != ""
+                                 otherwise  null,
+	"potentialYearsToGradUpdateOn": convPayload.potentialYearsToGradUpdateOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.potentialYearsToGradUpdateOn != null
+	                             otherwise null,
+	"potentialYearsToGradUpdateBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.potentialYearsToGradUpdateBy})[0].pidm) when convPayload.potentialYearsToGradUpdateBy != ""
+	                                otherwise null,
+	"preCertificationStatusUpdateOn": convPayload.preCertificationStatusUpdateOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.preCertificationStatusUpdateOn != null
+	                                  otherwise null,
+	"preCertificationStatusUpdateBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.preCertificationStatusUpdateBy})[0].pidm) when convPayload.preCertificationStatusUpdateBy != ""
+	                                  otherwise null,
+	"anticipatedGraduationTermOn": convPayload.anticipatedGraduationTermOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.anticipatedGraduationTermOn != null
+	                               otherwise null,
+	"anticipatedGraduationTermBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.anticipatedGraduationTermBy})[0].pidm) when convPayload.anticipatedGraduationTermBy != ""
+	                               otherwise null,
+	"hoursLeftToGraduateOn": convPayload.hoursLeftToGraduateOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.hoursLeftToGraduateOn != null
+	                         otherwise null,
+	"isStudentIndicatedNotReturningOn": convPayload.isStudentIndicatedNotReturningOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.isStudentIndicatedNotReturningOn != null
+	                                    otherwise null,
+	"hoursLeftToGraduateBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.hoursLeftToGraduateBy})[0].pidm) when convPayload.hoursLeftToGraduateBy != ""
+	                         otherwise null,
+	"isStudentIndicatedNotReturningBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.isStudentIndicatedNotReturningBy})[0].pidm) when convPayload.isStudentIndicatedNotReturningBy != ""
+	                                    otherwise null,
+	"hasFIFGradPlan": null,
+	"notesUpdatedOn": convPayload.notesUpdatedOn as :string {format: "MM/DD/YYYY HH:mm:ss"} when convPayload.notesUpdatedOn != null
+	                         otherwise null,
+	"notesUpdatedBy": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.notesUpdatedBy})[0].pidm) when convPayload.notesUpdatedBy != ""
+	                         otherwise null
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <flow-ref name="postStudentTrackingFlagsDBFlow" doc:name="postStudentTrackingFlagsDBFlow"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="convertToJavaAndTrackingFlow">
+        <dw:transform-message doc:name="Convert to Java and save in trackingResponsePayload variable">
+            <dw:set-variable variableName="trackingResponsePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload
+]]></dw:set-variable>
+        </dw:transform-message>
+    </flow>
+    <flow name="postStudentTrackingFlagsDBFlow">
+        <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+            <logger message="#[flowVars.studentTracking]" level="INFO" doc:name="Logger"/>
+            <db:update config-ref="Oracle_Configuration_BANNER" doc:name="Update student flags record">
+                <db:dynamic-query><![CDATA[UPDATE advisor_trackstudent ats
+SET
+    ats.scholarshipstatus = nvl(
+        '#[flowVars.studentTracking.scholarshipStatus]',
+        ats.scholarshipstatus
+    ),
+    ats.scholarshipstatusupdateby = nvl(
+        #[flowVars.studentTracking.scholarshipStatusUpdateBy],
+        ats.scholarshipstatusupdateby
+    ),
+    ats.scholarshipstatusupdateon = nvl(
+        to_date('#[flowVars.studentTracking.scholarshipStatusUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.scholarshipstatusupdateon
+    ),
+    ats.potentialyeartograd = nvl(
+        '#[flowVars.studentTracking.potentialYearsToGrad]',
+        ats.potentialyeartograd
+    ),
+    ats.potentialyeartogradupdateon = nvl(
+        to_date('#[flowVars.studentTracking.potentialYearsToGradUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.potentialyeartogradupdateon
+    ),
+    ats.potentialyeartogradupdateby = nvl(
+        #[flowVars.studentTracking.potentialYearsToGradUpdateBy],
+        ats.potentialyeartogradupdateby
+    ),
+    ats.precertificationstatus = nvl(
+        '#[flowVars.studentTracking.preCertificationStatus]',
+        ats.precertificationstatus
+    ),
+    ats.precertificationstatusupdateon = nvl(
+        to_date('#[flowVars.studentTracking.preCertificationStatusUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.precertificationstatusupdateon
+    ),
+    ats.precertificationstatusupdateby = nvl(
+        #[flowVars.studentTracking.preCertificationStatusUpdateBy],
+       ats. precertificationstatusupdateby
+    ),
+    ats.anticipatedgradterm = nvl(
+        '#[flowVars.studentTracking.anticipatedGraduationTerm]',
+        ats.anticipatedgradterm
+    ),
+    ats.anticipatedgradtermupdateon = nvl(
+        to_date('#[flowVars.studentTracking.anticipatedGraduationTermOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.anticipatedgradtermupdateon
+    ),
+    ats.anticipatedgradtermupdateby = nvl(
+        #[flowVars.studentTracking.anticipatedGraduationTermBy],
+        ats.anticipatedgradtermupdateby
+    ),
+    ats.hourslefttograduate = nvl(
+        #[flowVars.studentTracking.hoursLeftToGraduate],
+        ats.hourslefttograduate
+    ),
+    hourslefttograduateupdateon = nvl(
+        to_date('#[flowVars.studentTracking.hoursLeftToGraduateOn]','mm/dd/yyyy hh24:mi:ss'),
+        hourslefttograduateupdateon
+    ),
+    ats.hourslefttograduateupdateby = nvl(
+        #[flowVars.studentTracking.hoursLeftToGraduateBy],
+        ats.hourslefttograduateupdateby
+    ),
+    ats.isstudentnotreturning = nvl(
+        #[flowVars.studentTracking.isStudentIndicatedNotReturning],
+        ats.isstudentnotreturning
+    ),
+    ats.isstudentnotreturningupdateon = nvl(
+        to_date('#[flowVars.studentTracking.isStudentIndicatedNotReturningOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.isstudentnotreturningupdateon
+    ),
+    ats.isstudentnotreturningupdateby = nvl(
+        #[flowVars.studentTracking.isStudentIndicatedNotReturningBy],
+        ats.isstudentnotreturningupdateby
+    ),
+    ats.hasfifgradplan = nvl(
+        #[flowVars.studentTracking.hasFIFGradPlan],
+        ats.hasfifgradplan
+    ),
+    ats.notesUpdatedOn = nvl(
+        to_date('#[flowVars.studentTracking.notesUpdatedOn]','mm/dd/yyyy hh24:mi:ss'),
+        ats.notesUpdatedOn
+    ),
+    ats.notesUpdatedBy = nvl(
+        #[flowVars.studentTracking.notesUpdatedBy],
+        ats.notesUpdatedBy)
+WHERE
+pidm = #[flowVars.studentTracking.pidm]]]></db:dynamic-query>
+            </db:update>
+            <choice doc:name="Route to insert if update payload is 0">
+                <when expression="#[payload==0]">
+                    <db:insert config-ref="Oracle_Configuration_BANNER" doc:name="Insert student flags record">
+                        <db:dynamic-query><![CDATA[insert into advisor_trackstudent (PIDM,
+SCHOLARSHIPSTATUS,
+SCHOLARSHIPSTATUSUPDATEON,
+SCHOLARSHIPSTATUSUPDATEBY,
+POTENTIALYEARTOGRAD,
+POTENTIALYEARTOGRADUPDATEON,
+POTENTIALYEARTOGRADUPDATEBY,
+PRECERTIFICATIONSTATUS,
+PRECERTIFICATIONSTATUSUPDATEON,
+PRECERTIFICATIONSTATUSUPDATEBY,
+ANTICIPATEDGRADTERM,
+ANTICIPATEDGRADTERMUPDATEON,
+ANTICIPATEDGRADTERMUPDATEBY,
+HOURSLEFTTOGRADUATE,
+HOURSLEFTTOGRADUATEUPDATEON,
+HOURSLEFTTOGRADUATEUPDATEBY,
+ISSTUDENTNOTRETURNING,
+ISSTUDENTNOTRETURNINGUPDATEON,
+ISSTUDENTNOTRETURNINGUPDATEBY,
+HASFIFGRADPLAN,
+NOTESUPDATEDON,
+NOTESUPDATEDBY) values (#[flowVars.studentTracking.pidm],
+'#[flowVars.studentTracking.scholarshipStatus]',
+to_date('#[flowVars.studentTracking.scholarshipStatusUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.scholarshipStatusUpdateBy],
+'#[flowVars.studentTracking.potentialYearsToGrad]',
+to_date('#[flowVars.studentTracking.potentialYearsToGradUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.potentialYearsToGradUpdateBy],
+'#[flowVars.studentTracking.preCertificationStatus]',
+to_date('#[flowVars.studentTracking.preCertificationStatusUpdateOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.preCertificationStatusUpdateBy],
+'#[flowVars.studentTracking.anticipatedGraduationTerm]',
+to_date('#[flowVars.studentTracking.anticipatedGraduationTermOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.anticipatedGraduationTermBy],
+#[flowVars.studentTracking.hoursLeftToGraduate],
+to_date('#[flowVars.studentTracking.hoursLeftToGraduateOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.hoursLeftToGraduateBy],
+#[flowVars.studentTracking.isStudentIndicatedNotReturning],
+to_date('#[flowVars.studentTracking.isStudentIndicatedNotReturningOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.isStudentIndicatedNotReturningBy],
+#[flowVars.studentTracking.hasFIFGradPlan],
+to_date('#[flowVars.studentTracking.notesUpdatedOn]','mm/dd/yyyy hh24:mi:ss'),
+#[flowVars.studentTracking.notesUpdatedBy])]]></db:dynamic-query>
+                    </db:insert>
+                    <set-payload value="#[['status':'S', 'message':'Successfully inserted']]" doc:name="Set Payload insert success status"/>
+                </when>
+                <otherwise>
+                    <set-payload value="#[['status':'S', 'message':'Successfully updated']]" doc:name="Set Payload update success status"/>
+                </otherwise>
+            </choice>
+            <flow-ref name="convertToJavaAndTrackingFlow" doc:name="convertToJavaAndTrackingFlow"/>
+            <choice-exception-strategy doc:name="Choice Exception Strategy">
+                <catch-exception-strategy when="#[exception.causedBy(java.sql.SQLException)]" doc:name="Catch Exception Strategy">
+                    <logger message="#[&quot;Exception Testing:&quot; + exception.cause]" level="INFO" doc:name="Logger"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[exception.message.contains(&quot;ORA-&quot;)]">
+                            <set-variable variableName="dbErrMessage" value="#[exception.message]" doc:name="dbErrMessage Oracle error"/>
+                        </when>
+                        <otherwise>
+                            <set-variable variableName="dbErrMessage" value="Banner Database Error" doc:name="dbErrMessage Catch All"/>
+                        </otherwise>
+                    </choice>
+                    <set-payload value="#[['status':'F', 'message':flowVars.dbErrMessage]]" doc:name="Set Payload exception status"/>
+                </catch-exception-strategy>
+            </choice-exception-strategy>
+        </transactional>
+    </flow>
+    <batch:job name="syncFIFGradPlanBatch">
+        <batch:input>
+            <poll doc:name="Poll">
+                <fixed-frequency-scheduler frequency="30"  timeUnit="SECONDS"/>
+                <watermark variable="timeStamp" default-expression="#[&quot;2017-01-01 00:00:00&quot;]" selector="MAX" selector-expression="#[payload.dapmoddate]"/>
+                <flow-ref name="getAllDegreePlansBatchFlow" doc:name="getAllDegreePlansBatchFlow"/>
+            </poll>
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="Batch_Step">
+                <batch:set-record-variable variableName="degreeWorksPlan" value="#[payload]" doc:name="set record payload from Degree works query"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-variable variableName="studentTracking"><![CDATA[%dw 1.0
+%output application/java
+%var convPayload= recordVars.degreeWorksPlan
+---
+{
+	"pidm": (lookup("getPersonsByUsfIdFlow",{usfId:convPayload.dapstuid})[0].pidm),
+	"scholarshipStatus": '',
+	"potentialYearsToGrad": convPayload.potentialyrstograd,
+	"preCertificationStatus": '',
+	"anticipatedGraduationTerm": convPayload.grad_term,
+	"hoursLeftToGraduate": null,
+	"isStudentIndicatedNotReturning": null,
+	"scholarshipStatusUpdateOn": '',
+    "scholarshipStatusUpdateBy": null,
+	"potentialYearsToGradUpdateOn": '',
+	"potentialYearsToGradUpdateBy": null,
+	"preCertificationStatusUpdateOn": '',
+	"preCertificationStatusUpdateBy": null,
+	"anticipatedGraduationTermOn": '',
+	"anticipatedGraduationTermBy": null,
+	"hoursLeftToGraduateOn": '',
+	"isStudentIndicatedNotReturningOn": '',
+	"hoursLeftToGraduateBy": null,
+	"isStudentIndicatedNotReturningBy": null,
+	"hasFIFGradPlan": 1 when (convPayload.dapactiveflag == "Y") and (convPayload.daplocked == "Y")
+	otherwise 0,
+	"notesUpdatedOn": '',
+	"notesUpdatedBy": null
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <flow-ref name="postStudentTrackingFlagsDBFlow" doc:name="postStudentTrackingFlagsDBFlow"/>
+            </batch:step>
+        </batch:process-records>
+    </batch:job>
+     <flow name="getUnmappedStudentsAdvisorsFlow">
+        
+            <message-properties-transformer scope="invocation" doc:name="Set Student Advisors Parameters">
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="viewMapped" value="#[message.inboundProperties.'http.query.params'.viewMapped]"/>
+            <add-message-property key="collegeCode" value="#[message.inboundProperties.'http.query.params'.collegeCode]"/>
+            <add-message-property key="majorCode" value="#[message.inboundProperties.'http.query.params'.majorCode]"/>
+            </message-properties-transformer>
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="MAPPING RULES">
+            <db:parameterized-query><![CDATA[CALL BANINST1.WSAK_ADVISING.P_GET_UNMAPPED_RULES(
+    :P_VIEWMAPPED ,
+    :P_MAJORCODE ,
+    :P_COLLEGECODE,
+    :P_INITROW ,
+    :P_MAXROWS ,
+    :P_RECORDSET 
+  )]]></db:parameterized-query>
+            <db:in-param name="P_VIEWMAPPED" value="#[flowVars.viewMapped]"/>
+            <db:in-param name="P_MAJORCODE" value="#[flowVars.majorCode]"/>
+            <db:in-param name="P_COLLEGECODE" value="#[flowVars.collegeCode]"/>
+            <db:in-param name="P_INITROW" value="#[flowVars.initRow]"/>
+            <db:in-param name="P_MAXROWS" value="#[flowVars.maxRows]"/>
+            <db:out-param name="P_RECORDSET" type="CURSOR"/>
+        </db:stored-procedure>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"total_records" : payload.P_RECORDSET[0].TOTAL_RECORDS,
+	"data": payload.P_RECORDSET map ((payload01 , indexOfPayload01) -> {
+	  "studentsCount" : payload01.STUDENTSCOUNT ,
+	  "major" : payload01.MAJOR,
+      "college" : payload01.COLLEGE,
+      "admitCode" : payload01.ADMITCODE,
+      "studentClass" : payload01.STUDENTCLASS
+     
+	}),
+	"errors":[]
+
+	}
+	
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+
+
+</mule>

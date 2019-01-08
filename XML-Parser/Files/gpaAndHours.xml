@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <flow name="getLevelGpaAndHoursFlow">
+      <set-variable variableName="flowName" value="getLevelGpaAndHoursFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="get level Gpa">
+            <db:parameterized-query><![CDATA[select
+l.shrlgpa_gpa_type_ind gpaInd,
+l.shrlgpa_gpa  lgpa,
+l.shrlgpa_hours_attempted attemptedHours,
+l.shrlgpa_hours_earned earnedHours
+from shrlgpa l
+where l.shrlgpa_pidm= #[flowVars.pidm]
+AND l.shrlgpa_levl_code = #[flowVars.mainPayload[0].STUDENTLEVEL]]]></db:parameterized-query>
+
+        </db:select>
+        <set-variable variableName="data" value="#[payload]" doc:name="data"/>
+           <foreach doc:name="For Each">
+            <choice doc:name="Choice">
+                <when expression="#[payload.gpaInd == 'O']">
+                    <set-variable variableName="overallGpa" value="#[payload.lgpa]" doc:name="overallGpa"/>
+                    <set-variable variableName="overallHoursAttempted" value="#[payload.attemptedHours]" doc:name="overallHoursAttempted"/>
+                    <set-variable variableName="overallEarnedHours" value="#[payload.earnedHours]" doc:name="overallEarnedHours"/>
+                </when>
+                <when expression="#[payload.gpaInd == 'T']">
+                    <set-variable variableName="transferGpa" value="#[payload.lgpa]" doc:name="transferGpa"/>
+                    <set-variable variableName="transferHoursAttempted" value="#[payload.attemptedHours]" doc:name="transferHoursAttempted"/>
+                    <set-variable variableName="transferEarnedHours" value="#[payload.earnedHours]" doc:name="transferEarnedHours"/>
+                </when>
+                <when expression="#[payload.gpaInd == 'I']">
+                    <set-variable variableName="institutionalGpa" value="#[payload.lgpa]" doc:name="institutionalGpa"/>
+                    <set-variable variableName="institutionalHoursAttempted" value="#[payload.attemptedHours]" doc:name="institutionalHoursAttempted"/>
+                    <set-variable variableName="institutionalEarnedHours" value="#[payload.earnedHours]" doc:name="institutionalEarnedHours"/>
+                </when>
+                <otherwise>
+                    <logger level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+"gpa":{
+	"overallGpa" : flowVars.overallGpa,
+	"transferGpa" : flowVars.transferGpa,
+	"institutionalGpa" :flowVars.institutionalGpa
+	  },
+"hours":
+{
+	"attemptedHours":{
+		"overallAttemptedHours" : flowVars.overallHoursAttempted,
+		"transferAttemptedHours" : flowVars.transferHoursAttempted,
+		"institutionalAttemptedHours" :flowVars.institutionalHoursAttempted },
+	"earnedHours":{
+		"overallEarnedHours" : flowVars.overallEarnedHours,
+		"transferEarnedHours" : flowVars.transferEarnedHours,
+		"institutionalEarnedHours" :flowVars.institutionalEarnedHours}
+}
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getLevelGpaAndHoursFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+   <flow name="getExcessHoursFlow">
+     <set-variable variableName="flowName" value="getExcessHoursFlow" doc:name="Set flow variable for flowName" />
+     <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+         level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Excess Hours">
+            <db:parameterized-query><![CDATA[select
+ h.swrxcrh_excess_hrs  excessHrs,
+ h.swrxcrh_excess_hrs_cnt_dwn excessHrsCntDwn ,
+ h.SWRXCRH_THRESHOLD_HRS excessHrsThreshold ,
+ h.SWRXCRH_EXCESS_HRS_CHRGD_CUM excessHrsChrgdCum
+from swrxcrh h
+where
+h.swrxcrh_proc_term= #[flowVars.currentTerm]
+and
+h.swrxcrh_seq_no = (select max(hh.swrxcrh_seq_no) from swrxcrh hh
+                                where hh.swrxcrh_pidm = h.swrxcrh_pidm
+                                and hh.swrxcrh_proc_term=h.swrxcrh_proc_term)
+and swrxcrh_pidm = #[flowVars.pidm]]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="excessHours" value="#[payload]" doc:name="excessHours"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var xhrs=payload[0]
+---
+{
+
+"excessHours":{
+	"countDownHours": xhrs.EXCESSHRSCNTDWN,
+	"chargedExcessHours" : xhrs.EXCESSHRS,
+	"thresholdHours" : xhrs.EXCESSHRSTHRESHOLD,
+	"cummulativeChargedHours": xhrs.EXCESSHRSCHRGDCUM
+	}
+}
+
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getExcessHoursFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getRegisteredHoursFlow">
+      <set-variable variableName="flowName" value="getRegisteredHoursFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <scatter-gather doc:name="Scatter-Gather">
+            <processor-chain>
+                <db:select config-ref="Oracle_Configuration_BANNER" doc:name="getRegisteredHours">
+                    <db:parameterized-query><![CDATA[SELECT SUM(NVL(SFRSTCR_CREDIT_HR,0)) creditHours
+         FROM   SFRSTCR R,STVRSTS V
+         WHERE  R.SFRSTCR_RSTS_CODE = V.STVRSTS_CODE AND
+                V.STVRSTS_INCL_SECT_ENRL ='Y' AND
+                SFRSTCR_PIDM = #[flowVars.pidm]  AND
+         SFRSTCR_TERM_CODE =#[flowVars.currentTerm]]]></db:parameterized-query>
+
+                </db:select>
+                <set-variable variableName="creditHours" value="#[payload]" doc:name="creditHours"/>
+
+            </processor-chain>
+            <processor-chain>
+                <db:select config-ref="Oracle_Configuration_BANNER" doc:name="get registered bill hours">
+                    <db:parameterized-query><![CDATA[SELECT SUM(NVL(SFRSTCR_BILL_HR, 0)) billHours
+         FROM   SFRSTCR R,STVRSTS V
+         WHERE  R.SFRSTCR_RSTS_CODE = V.STVRSTS_CODE AND
+                V.STVRSTS_INCL_ASSESS ='Y' AND
+                SFRSTCR_PIDM = #[flowVars.pidm]  AND
+         SFRSTCR_TERM_CODE =#[flowVars.currentTerm]]]></db:parameterized-query>
+
+                </db:select>
+                <set-variable variableName="billHours" value="#[payload]" doc:name="billHours"/>
+
+            </processor-chain>
+        </scatter-gather>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+
+{
+	"registeredHours":
+	{
+	"creditHours" : payload[0][0].creditHours,
+	"billHours" : payload[1][0].billHours
+
+	}
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getRegisteredHoursFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getAllHoursAndGpaFlow">
+      <set-variable variableName="flowName" value="getAllHoursAndGpaFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <scatter-gather doc:name="Scatter-Gather">
+            <flow-ref name="getLevelGpaAndHoursFlow" doc:name="getLevelGpaAndHoursFlow"/>
+            <flow-ref name="getExcessHoursFlow" doc:name="getExcessHoursFlow"/>
+            <flow-ref name="getRegisteredHoursFlow" doc:name="getRegisteredHoursFlow"/>
+        </scatter-gather>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var gpaHrs=payload[0]
+%var xHrs=payload[1]
+%var regHrs=payload[2]
+%var main= flowVars.mainPayload[0]
+---
+
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"studentLevel" :main.studentLevel,
+"gpa":gpaHrs.gpa,
+"hours":gpaHrs.hours,
+"registeredHours": regHrs.registeredHours,
+"excessHours":xHrs.excessHours
+
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getAllHoursAndGpaFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>

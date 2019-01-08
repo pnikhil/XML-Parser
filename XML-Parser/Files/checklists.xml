@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="getChecklistsByApplicantFlow">
+        <set-variable variableName="flowName" value="getChecklistsByApplicantFlow" doc:name="Set flowName to getChecklistsByApplicantFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="DEBUG" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Check that a PIDM has been returned">
+            <when expression="#[payload != empty]">
+                <set-variable variableName="personPayload" value="#[payload]" mimeType="application/java" doc:name="setPersonPayload"/>
+                <message-properties-transformer scope="invocation" doc:name="Set Message Properties for retrieving checklists">
+                    <add-message-property key="pidm" value="#[flowVars.personPayload[0].pidm]"/>
+                    <add-message-property key="entryTerm" value="#[message.inboundProperties.'http.query.params'.entryTerm]"/>
+                    <add-message-property key="applNo" value="#[message.inboundProperties.'http.query.params'.applicationNumber]"/>
+                    <add-message-property key="codeGroup" value="ADMCHKLIST"/>
+                </message-properties-transformer>
+                <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get checklists for an applicant">
+                    <db:parameterized-query><![CDATA[SELECT
+    saradap.saradap_term_code_entry,
+    saradap.saradap_appl_no,
+    saradap.saradap_levl_code,
+    saradap.saradap_admt_code,
+    stvadmt.stvadmt_desc,
+    saradap.saradap_styp_code,
+    stvstyp.stvstyp_desc,
+    sarchkl.sarchkl_admr_code,
+    nvl(
+        chklist_xwlk.stdn_desc,
+        stvadmr.stvadmr_desc
+    ) chklist_desc,
+    chklist_xwlk.help_text help_text,
+    stvadmr.stvadmr_disp_web_ind,
+    DECODE(
+        sarchkl.sarchkl_source,
+        'S',
+        'System',
+        'U',
+        'Manual'
+    ) source,
+    sarchkl.sarchkl_source_date,
+    sarchkl.sarchkl_mandatory_ind,
+    sarchkl.sarchkl_req_date1,
+    sarchkl.sarchkl_req_date2,
+    sarchkl.sarchkl_req_count,
+    sarchkl.sarchkl_code_value,
+    sarchkl.sarchkl_comment,
+    nvl(
+        sarchkl.sarchkl_receive_date,
+        sorpcol.sorpcol_trans_recv_date
+    ) received_date,
+    sorpcol.sorpcol_official_trans
+FROM
+    sarchkl
+    JOIN stvadmr ON stvadmr.stvadmr_code = sarchkl.sarchkl_admr_code
+    JOIN saradap ON
+        saradap.saradap_pidm = sarchkl.sarchkl_pidm
+    AND 
+        saradap.saradap_pidm = #[flowVars.pidm]
+    AND
+        saradap.saradap_term_code_entry = sarchkl.sarchkl_term_code_entry
+    AND (
+        #[flowVars.entryTerm] is null
+        OR( #[flowVars.entryTerm] is not null
+        AND
+        saradap.saradap_term_code_entry = #[flowVars.entryTerm])
+        )
+    AND saradap.saradap_appl_no = sarchkl.sarchkl_appl_no
+    AND (
+        #[flowVars.applNo] is null
+        OR ( #[flowVars.applNo] IS NOT NULL
+        AND saradap.saradap_appl_no = #[flowVars.applNo])
+        )
+    JOIN stvadmt ON stvadmt.stvadmt_code = saradap.saradap_admt_code
+    JOIN stvstyp ON stvstyp.stvstyp_code = saradap.saradap_styp_code
+    LEFT OUTER JOIN sorpcol ON
+        sorpcol_pidm = sarchkl.sarchkl_pidm
+    AND
+        sorpcol.sorpcol_sbgi_code = sarchkl.sarchkl_code_value
+    LEFT OUTER JOIN (
+        SELECT
+            *
+        FROM
+            (
+                SELECT
+                    gtvsdax_external_code,
+                    gtvsdax_comments,
+                    gtvsdax_internal_code
+                FROM
+                    gtvsdax
+                WHERE
+                    gtvsdax_internal_code_group =#[flowVars.codeGroup]
+            )
+                PIVOT ( MAX ( TO_CHAR(gtvsdax_comments) )
+                    FOR gtvsdax_internal_code
+                    IN ( 'HELPTEXT' AS help_text,'STDNDESC' AS stdn_desc )
+                )
+    ) chklist_xwlk ON chklist_xwlk.gtvsdax_external_code = stvadmr.stvadmr_code]]></db:parameterized-query>
+                </db:select>
+                <dw:transform-message doc:name="Transform payload to JSON">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+
+{
+  responseCode: 0,
+  responseMessage: "Data retrieved successfully",
+  data: payload distinctBy $.saradap_term_code_entry map using (entryTerm = $.saradap_term_code_entry) {
+  	applicationTerm: $.saradap_term_code_entry,
+  	applicationNumber: $.saradap_appl_no,
+  	checklists: payload filter $.saradap_term_code_entry == entryTerm map using (applNo = $.saradap_appl_no) {
+  		code: $.sarchkl_admr_code,
+  		desc: $.chklist_desc,
+  		helpText: $.help_text,
+  		mandatory: $.sarchkl_mandatory_ind,
+  		displayToApplicant: true when $.stvadmr_disp_web_ind == 'Y' otherwise false,
+  		institutionCode: $.sarchkl_code_value,
+  		comment: $.sarchkl_comment,
+  		received: $.received_date,
+  		finalCollegeTranscript: $.sorpcol_official_trans
+  		
+  	}
+  },
+  errors: []
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform payload and capture the person doesnt exist">
+                    <dw:set-payload><![CDATA[%dw 1.0
+
+%output application/json
+
+---
+{
+	"responseCode": -1,
+	"responseMessage": "Data retrieved successfully",
+	"data": [],
+	"errors":[{
+		message: "Person not found."
+	}]
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+    </flow>
+</mule>

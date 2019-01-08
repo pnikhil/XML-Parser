@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="getTestScoresFlow">
+        <set-variable variableName="flowName" value="getTestScoresFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows == empty?'10':message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow == empty ?'1':message.inboundProperties.'http.query.params'.initRow]"/>
+        </message-properties-transformer>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+         <set-variable variableName="person" value="#[payload]" doc:name="setPerson"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Database To Get TestScores">
+            <db:parameterized-query><![CDATA[select * from 
+(select ROWNUM rn, a.* from
+(select 
+ count(*) over() total_records,
+s.SORTEST_PIDM ,
+s.SORTEST_TESC_CODE,
+s.SORTEST_TEST_DATE,
+s.SORTEST_TEST_SCORE,
+s.SORTEST_ADMR_CODE,
+s.SORTEST_TSRC_CODE,
+p.SWVCOMP_CALC_IND,
+p.SWVCOMP_CODE,
+p.SWVCOMP_SHRT_DESC,
+v.SWVTEST_DESC,
+c.STVTESC_DESC,
+g.GORADID_ADDITIONAL_ID,
+SWVCOMP_CODE||' '||SORTEST_TEST_DATE testCodeDate
+FROM sortest s
+LEFT OUTER JOIN swvcomp p
+ON (swvcomp_component = sortest_tesc_code )
+--AND swvcomp_calc_ind = 'Y')
+LEFT OUTER JOIN swvtest v
+ON (swvtest_code = swvcomp_code)
+LEFT OUTER JOIN stvtesc c
+ON (c.stvtesc_code = s.SORTEST_TESC_CODE)
+LEFT OUTER JOIN goradid g
+ON (g.GORADID_PIDM = s.SORTEST_PIDM and 
+    g.GORADID_ADID_CODE = p.swvcomp_code)
+WHERE sortest_pidm =  #[flowVars.person[0].PIDM]
+order by SORTEST_TESC_CODE
+) a)
+where rn >= #[flowVars.initRow] and 
+rn <= (#[flowVars.initRow] + #[flowVars.maxRows] - 1)]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message to Java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	totalRecords:payload[0].TOTAL_RECORDS,
+	"data":[{
+		firstName: flowVars.person[0].fName,
+		middleInitial: flowVars.person[0].mi,
+		lastName: flowVars.person[0].lName,
+		usfId: flowVars.person[0].id,
+		tests: payload   map ((tests , indexOfTests) -> {
+		   		testComponent: tests.SORTEST_TESC_CODE,
+				testDescription: tests.STVTESC_DESC,
+				testScore: tests.SORTEST_TEST_SCORE,
+				testDate: tests.SORTEST_TEST_DATE,
+				request:tests.SORTEST_ADMR_CODE,
+				source:tests.SORTEST_TSRC_CODE
+		})
+			
+			}],
+	"errors":[]
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getTestScoresFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getTestScoresBycomponentFlow">
+        <set-variable variableName="flowName" value="getTestScoresBycomponentFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <flow-ref name="getTestScoresFlow" doc:name="getTestScoresFlow"/>
+        <dw:transform-message doc:name="Transform payload to JSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var main=payload distinctBy $.testCodeDate
+
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data":[{
+		firstName: flowVars.person[0].fName,
+		middleInitial: flowVars.person[0].mi,
+		lastName: flowVars.person[0].lName,
+		usfId: flowVars.person[0].id,
+		tests: payload distinctBy $.TESTCODEDATE  map using (varTestCode = $.SWVCOMP_CODE , varTestDate = $.SORTEST_TEST_DATE)  {
+			testCode: $.SWVCOMP_CODE,
+		    testDescription: $.SWVTEST_DESC,
+		    testId: $.GORADID_ADDITIONAL_ID,
+		    testDate: $.SORTEST_TEST_DATE,
+		   		testDetails: payload filter $.SWVCOMP_CODE == varTestCode and $.SORTEST_TEST_DATE == varTestDate map ((tests , indexOfTests) -> {
+		    	testComponent: tests.SORTEST_TESC_CODE,
+				testDescription: tests.SWVCOMP_SHRT_DESC,
+				testScore: tests.SORTEST_TEST_SCORE
+				
+			}
+			)}
+			
+			}],
+	"errors":[]
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+</mule>

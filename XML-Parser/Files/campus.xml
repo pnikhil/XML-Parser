@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+  <flow name="getCampusFlow">
+      <set-variable variableName="flowName" value="getCampusFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <choice doc:name="Choice">
+            <when expression="#[message.inboundProperties.'http.query.params'.campus == 'Tampa']">
+                <set-variable variableName="campusCode" value="T" doc:name="Set Tampa Campus Variable"/>
+            </when>
+            <when expression="#[message.inboundProperties.'http.query.params'.campus == 'St. Petersburg']">
+                <set-variable variableName="campusCode" value="P" doc:name="set St-Petersburg Campus Variable"/>
+            </when>
+            <when expression="#[message.inboundProperties.'http.query.params'.campus =='Sarasota-Manatee']">
+                <set-variable variableName="campusCode" value="S" doc:name="set Sarasota Campus Variable"/>
+            </when>
+            <otherwise>
+                <logger message="defaultCampus" level="INFO" doc:name="Logger"/>
+
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

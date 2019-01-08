@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <flow name="getCohortPidmFlow">
+      <set-variable variableName="flowName" value="getCohortPidmFlow" doc:name="Set flow variable for flowName" />
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="pidm"/>
+        <flow-ref name="getCohortFlow" doc:name="getCohortFlow"/>
+    </flow>
+    <flow name="getCohortFlow">
+      <set-variable variableName="flowName" value="getCohortFlow" doc:name="Set flow variable for flowName" />
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="get Cohort info">
+            <db:parameterized-query><![CDATA[SELECT NVL(c.sgrchrt_chrt_code,'UNDEFINED') COHORTCODE, NVL(t.stvchrt_desc ,'UNDEFINED') COHORTDESC
+           FROM sgrchrt c ,stvchrt t
+           WHERE c.sgrchrt_chrt_code = t.stvchrt_code
+           AND c.sgrchrt_term_code_eff =
+                 (SELECT MAX(tt.sgrchrt_term_code_eff) from sgrchrt tt
+                     WHERE c.sgrchrt_pidm =tt.sgrchrt_pidm)
+                     and c.sgrchrt_pidm =#[flowVars.pidm]]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="cohorts" value="#[payload]" doc:name="cohorts"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var main= flowVars.mainPayload[0]
+---
+
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"cohorts" : flowVars.cohorts map ((chrt , indexOfchrt) -> {
+
+		"cohortCode" : chrt.cohortCode,
+		"cohortDescription" : chrt.cohortDesc
+
+	})
+
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+</mule>

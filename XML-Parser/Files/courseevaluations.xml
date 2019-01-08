@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <flow name="getCourseEvaluationsFlow">
+         <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.instructionTerm]"/>
+             <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="startTerm" value="#[message.inboundProperties.'http.query.params'.startTerm]"/>
+            <add-message-property key="endTerm" value="#[message.inboundProperties.'http.query.params'.endTerm]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.usfId]"/>
+            <add-message-property key="crn" value="#[message.inboundProperties.'http.query.params'.courseRefNumber]"/>
+            <add-message-property key="uNumber" value="#[message.inboundProperties.'http.uri.params'.usfId]"/>
+        </message-properties-transformer>
+        <db:select config-ref="FAIR_Database_Configuration" doc:name="Get Student Evaluations from FAIR">
+            <db:parameterized-query><![CDATA[select * from 
+(
+select  row_number() over( order by eval.termid desc) rowNums,count(*) over() as total,
+eval.termid termId,
+eval.nbr_enrolled nbrEnrolled,
+eval.nbr_Responding nbrResponding,
+eval.AllAvg courseAverage,
+eval.AllMedian courseMedian,
+eval.courseID courseRef,
+eval.E1,
+eval.E1Median,
+eval.E1DeptAvg,
+eval.E1DeptMedian,
+eval.E1CollAvg,
+eval.E1CollMedian,
+eval.E2,
+eval.E2Median,
+eval.E2DeptAvg,
+eval.E2DeptMedian,
+eval.E2CollAvg,
+eval.E2CollMedian,
+eval.E3,
+eval.E3Median,
+eval.E3DeptAvg,
+eval.E3DeptMedian,
+eval.E3CollAvg,
+eval.E3CollMedian,
+eval.E4,
+eval.E4Median,
+eval.E4DeptAvg,
+eval.E4DeptMedian,
+eval.E4CollAvg,
+eval.E4CollMedian,
+eval.E5,
+eval.E5Median,
+eval.E5DeptAvg,
+eval.E5DeptMedian,
+eval.E5CollAvg,
+eval.E5CollMedian,
+eval.E6,
+eval.E6Median,
+eval.E6DeptAvg,
+eval.E6DeptMedian,
+eval.E6CollAvg,
+eval.E6CollMedian,
+eval.E7,
+eval.E7Median,
+eval.E7DeptAvg,
+eval.E7DeptMedian,
+eval.E7CollAvg,
+eval.E7CollMedian,
+eval.E8,
+eval.E8Median,
+eval.E8DeptAvg,
+eval.E8DeptMedian,
+eval.E8CollAvg,
+eval.E8CollMedian
+from dbo.StudentEvalFIS  eval  
+where eval.PID1Alternate= #[flowVars.usfId]
+and ((eval.CourseId = #[flowVars.crn] and ISNULL(#[flowVars.crn],'N') != 'N') or ISNULL(#[flowVars.crn],'N') = 'N')
+
+and 
+(
+ (eval.termid = #[flowVars.term] and ISNULL(#[flowVars.term],'N') != 'N') 
+ or 
+  (ISNULL(#[flowVars.term],'N') = 'N'
+  and (
+ (eval.termid >= #[flowVars.startTerm] and eval.termid  <= #[flowVars.endTerm] ) 
+  and ISNULL(#[flowVars.startTerm],'N') != 'N' and ISNULL(#[flowVars.endTerm],'N') != 'N') 
+))
+)t
+ where t.rowNums >= cast(#[flowVars.initRow] as int) and 
+t.rowNums <= (cast(#[flowVars.initRow] as int) + cast(#[flowVars.maxRows] as int) - 1)]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="studentEvals" value="#[payload]" doc:name="studentEvals"/>
+        <flow-ref name="getPersonsDBFlow" doc:name="getPersonsDBFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var evals=flowVars.studentEvals[0]
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"totalRecords":evals.total,
+	"data": {
+	"uNumber":flowVars.usfId,
+	"firstName":payload[0].fname,
+	"lastName":payload[0].lname,
+	"courseEvaluations":flowVars.studentEvals map ((eval,indexOfeval) -> {
+			"term": eval.termId,
+			"courseRefNumber": eval.courseRef,
+			"numberOfStudents" : eval.nbrEnrolled,
+			"totalStudentResponded":eval.nbrResponding,
+			"averageRating":eval.courseAverage,
+			"medianRating":eval.courseMedian,
+			"E1AverageScore":eval.E1,
+			"E1MedianScore":eval.E1Median,
+			"E1DepartmentAverage":eval.E1DeptAvg,
+			"E1DepartmentMedian":eval.E1DeptMedian,
+			"E1CollegeAverage":eval.E1CollAvg,
+			"E1CollegeMedian":eval.E1CollMedian ,
+			"E2AverageScore":eval.E2,
+			"E2MedianScore":eval.E2Median,
+			"E2DepartmentAverage":eval.E2DeptAvg,
+			"E2DepartmentMedian":eval.E2DeptMedian,
+			"E2CollegeAverage":eval.E2CollAvg,
+			"E2CollegeMedian":eval.E2CollMedian,
+			"E3AverageScore":eval.E3,
+			"E3MedianScore":eval.E3Median,
+			"E3DepartmentAverage":eval.E3DeptAvg,
+			"E3DepartmentMedian":eval.E3DeptMedian,
+			"E3CollegeAverage":eval.E3CollAvg,
+			"E3CollegeMedian":eval.E3CollMedian ,
+			"E4AverageScore":eval.E4,
+			"E4MedianScore":eval.E4Median,
+			"E4DepartmentAverage":eval.E4DeptAvg,
+			"E4DepartmentMedian":eval.E4DeptMedian,
+			"E4CollegeAverage":eval.E4CollAvg,
+			"E4CollegeMedian":eval.E4CollMedian ,
+		    "E5AverageScore":eval.E5,
+			"E5MedianScore":eval.E5Median,
+		 	"E5DepartmentAverage":eval.E5DeptAvg,
+		 	"E5DepartmentMedian":eval.E5DeptMedian,
+		 	"E5CollegeAverage":eval.E5CollAvg,
+			"E5CollegeMedian":eval.E5CollMedian ,
+		    "E6AverageScore":eval.E6,
+		 	"E6MedianScore":eval.E6Median,
+			"E6DepartmentAverage":eval.E6DeptAvg,
+			"E6DepartmentMedian":eval.E6DeptMedian,
+			"E6CollegeAverage":eval.E6CollAvg,
+			"E6CollegeMedian":eval.E6CollMedian ,				 						 					 				
+			"E7AverageScore":eval.E7,
+			"E7MedianScore":eval.E7Median,
+			"E7DepartmentAverage":eval.E7DeptAvg,
+			"E7DepartmentMedian":eval.E7DeptMedian,
+			"E7CollegeAverage":eval.E7CollAvg,
+			"E7CollegeMedian":eval.E7CollMedian ,
+			"E8AverageScore":eval.E8,
+			"E8MedianScore":eval.E8Median,
+			"E8DepartmentAverage":eval.E8DeptAvg,
+			"E8DepartmentMedian":eval.E8DeptMedian,
+			"E8CollegeAverage":eval.E8CollAvg,
+			"E8CollegeMedian":eval.E8CollMedian	 					 						
+					
+					 })
+			},
+	
+	"errors":[]
+} ]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getCourseEvaluationsCommentsFlow">
+        <message-properties-transformer scope="invocation" doc:name="Set Parameters">
+            <add-message-property key="term" value="#[message.inboundProperties.'http.query.params'.instructionTerm]"/>
+            <add-message-property key="initRow" value="#[message.inboundProperties.'http.query.params'.initRow]"/>
+            <add-message-property key="maxRows" value="#[message.inboundProperties.'http.query.params'.maxRows]"/>
+            <add-message-property key="startTerm" value="#[message.inboundProperties.'http.query.params'.startTerm]"/>
+            <add-message-property key="endTerm" value="#[message.inboundProperties.'http.query.params'.endTerm]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.usfId]"/>
+            <add-message-property key="crn" value="#[message.inboundProperties.'http.query.params'.courseRefNumber]"/>
+            <add-message-property key="uNumber" value="#[message.inboundProperties.'http.uri.params'.usfId]"/>
+        </message-properties-transformer>
+        <db:select config-ref="FAIR_Database_Configuration" doc:name="Get Student Evaluations Comments from FAIR">
+            <db:parameterized-query><![CDATA[select * from 
+(
+select  row_number() over( order by eval.termid desc) rowNums,count(*) over() as total,
+eval.termid termId,
+eval.courseID courseRef,
+comm.comment
+from dbo.StudentEvalFIS  eval  
+INNER JOIN dbo.AnnualReportCourseFeedback comm
+ON(eval.courseID =comm.courseID
+and eval.termid=comm.termid
+and eval.PID=comm.PID) 
+where eval.PID1Alternate= #[flowVars.usfId]
+and ((eval.CourseId = #[flowVars.crn] and ISNULL(#[flowVars.crn],'N') != 'N') or ISNULL(#[flowVars.crn],'N') = 'N')
+
+and 
+(
+ (eval.termid = #[flowVars.term] and ISNULL(#[flowVars.term],'N') != 'N') 
+ or 
+  (ISNULL(#[flowVars.term],'N') = 'N'
+  and (
+ (eval.termid >= #[flowVars.startTerm] and eval.termid  <= #[flowVars.endTerm] ) 
+  and ISNULL(#[flowVars.startTerm],'N') != 'N' and ISNULL(#[flowVars.endTerm],'N') != 'N') 
+))
+)t
+ where t.rowNums >= cast(#[flowVars.initRow] as int) and 
+t.rowNums <= (cast(#[flowVars.initRow] as int) + cast(#[flowVars.maxRows] as int) - 1)]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="studentEvals" value="#[payload]" doc:name="studentEvals"/>
+        <flow-ref name="getPersonsDBFlow" doc:name="getPersonsDBFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var evals=flowVars.studentEvals[0]
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"totalRecords":evals.total,
+	"data": {
+	"uNumber":flowVars.usfId,
+	"firstName":payload[0].fname,
+	"lastName":payload[0].lname,
+	"courseEvaluations":flowVars.studentEvals map ((eval,indexOfeval) -> {
+			"term": eval.termId,
+			"courseRefNumber": eval.courseRef,
+			"studentComments":eval.comment
+		 })
+			},
+	
+	"errors":[]
+} ]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    
+</mule>

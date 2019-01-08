@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+     <flow name="getEmailPidmFlow">
+        <set-variable variableName="flowName" value="getEmailPidmFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="pidm"/>
+        <flow-ref name="getEmailFlow" doc:name="getEmailFlow"/>
+    </flow>
+    <flow name="getEmailFlow">
+        <set-variable variableName="flowName" value="getEmailFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="email Database">
+            <db:parameterized-query><![CDATA[SELECT goremal_email_address usfEmail
+                FROM (SELECT ae.goremal_pidm
+                            ,ae.goremal_email_address
+                            ,row_number() over(PARTITION BY ae.goremal_pidm ORDER BY ae.goremal_preferred_ind DESC, ae.goremal_status_ind, ae.goremal_emal_code, ae.goremal_activity_date DESC) AS row_rank
+                        FROM goremal ae
+                       WHERE ae.goremal_emal_code = 'USF'
+                         AND ae.goremal_status_ind = 'A')
+               WHERE goremal_pidm = #[flowVars.pidm]
+                 AND row_rank = 1]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+
+payload
+
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getEmailFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" 
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <sub-flow name="emailSub_Flow">
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log generic flow details"/>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get email ">
+            <db:parameterized-query><![CDATA[SELECT
+    goremal_email_address email
+    from 
+    (
+        SELECT
+            ae.goremal_pidm,
+            ae.goremal_email_address,
+            ROW_NUMBER() OVER(PARTITION BY
+                ae.goremal_pidm
+                ORDER BY
+                    ae.goremal_preferred_ind
+                DESC,
+                    ae.goremal_status_ind,
+                    ae.goremal_emal_code,
+                    ae.goremal_activity_date
+                DESC
+            ) AS row_rank
+        FROM
+            goremal ae
+        WHERE
+                ae.goremal_emal_code =#[flowVars.emailType]
+            AND
+                ae.goremal_status_ind = 'A'
+    )
+WHERE
+        goremal_pidm =#[flowVars.pidm]
+    AND
+        row_rank = 1]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="emailTypePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;" level="INFO" category="edu.usf.esb.${app.application.name}" doc:name="Log timing"/>
+    </sub-flow>
+</mule>

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="getPersonsFlow">
+      <set-variable variableName="flowName" value="getPersonsFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <message-properties-transformer scope="invocation" doc:name="Set query parameter">
+            <add-message-property key="uNumber" value="#[message.inboundProperties.'http.uri.params'.studentId]"/>
+        </message-properties-transformer>
+        <flow-ref name="getPersonsDBFlow" doc:name="getPersonsDBFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getPersonsFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="getPersonsJSONOutputFlow">
+      <set-variable variableName="flowName" value="getPersonsJSONOutputFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data":[{
+			firstName: payload.FNAME[0],
+			middleInitial: payload.MI[0],
+			lastName: payload.LNAME[0],
+			gender: payload.GENDER[0],
+			ethnicityCode: payload.ETHNCODE[0],
+			citizenCode: payload.CITZENCODE[0],
+			usfId: payload.ID[0],
+			privacyFlag: payload.PRIVACYFLAG[0],
+			isVeteran: payload.ISVETERAN[0],
+			pidm: payload.PIDM[0],
+			dateOfBirth: payload.DOB[0]
+		}]
+	,
+	"errors":[]
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getPersonsDBFlow">
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Person data">
+            <db:parameterized-query><![CDATA[select spriden.SPRIDEN_ID id,
+       spriden.SPRIDEN_PIDM pidm,
+       spriden.SPRIDEN_FIRST_NAME fName,
+       spriden.SPRIDEN_LAST_NAME lName,
+       spriden.SPRIDEN_MI mi,
+       SATURN.SPBPERS.SPBPERS_BIRTH_DATE dob,
+       SATURN.SPBPERS.SPBPERS_ETHN_CODE ethnCode,
+       SATURN.SPBPERS.SPBPERS_SEX gender,
+       SATURN.SPBPERS.SPBPERS_CONFID_IND privacyFlag,
+       SATURN.SPBPERS.SPBPERS_CITZ_CODE citzenCode,
+       SATURN.SPBPERS.SPBPERS_CITZ_IND isCitizen,
+       SATURN.SPBPERS.SPBPERS_ARMED_SERV_MED_VET_IND isVeteran
+from spriden
+inner join SATURN.SPBPERS
+on SATURN.SPBPERS.SPBPERS_PIDM = spriden_pidm
+where spriden_id = #[flowVars.uNumber]
+and spriden_change_ind is null]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message to java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getPersonsByUsfIdFlow">
+        <set-variable variableName="uNumber" value="#[payload.usfId]" doc:name="Set uNumber variable"/>
+        <flow-ref name="getPersonsDBFlow" doc:name="getPersonsDBFlow"/>
+    </flow>
+    
+        <flow name="createPersonRecordFlow">
+        <dw:transform-message doc:name="Set flowVars.record as payload">
+            <dw:set-variable resource="classpath:dwScripts/person/convertToJavaWtihSQLDates.dwl" variableName="record"/>
+
+        </dw:transform-message>  
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="create spriden record">
+            <db:parameterized-query><![CDATA[call baninst1.gb_identification.p_create(
+	:p_id_inout,
+    :p_last_name,
+    :p_first_name,
+    :p_mi,
+    :p_change_ind,
+    :p_entity_ind,
+    :p_user,
+    :p_origin,
+    :p_ntyp_code,
+    :p_data_origin,
+    :p_surname_prefix,
+    :p_pidm_inout,
+    :p_rowid_out
+)]]></db:parameterized-query>
+            <db:in-param name="p_last_name" type="VARCHAR" value="#[flowVars.record.person.lastName]"/>
+            <db:in-param name="p_first_name" type="VARCHAR" value="#[flowVars.record.person.firstName]"/>
+            <db:in-param name="p_mi" type="VARCHAR" value="#[flowVars.record.person.middleInitial]"/>
+            <db:in-param name="p_change_ind" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_entity_ind" type="VARCHAR" value="#['P']"/>
+            <db:in-param name="p_user" type="VARCHAR" value="#['mulesoft']"/>
+            <db:in-param name="p_origin" type="VARCHAR" value="#[flowVars.record.dataSource + '_via_sys-students']"/>
+            <db:in-param name="p_ntyp_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_data_origin" type="VARCHAR" value="#[flowVars.record.dataSource + '_via_sys-students']"/>
+            <db:in-param name="p_surname_prefix" type="VARCHAR" value="#[flowVars.record.person.honorificPrefix]"/>
+            <db:out-param name="p_rowid_out" type="VARCHAR"/>
+            <db:inout-param name="p_id_inout" type="VARCHAR" value="#[flowVars.record.person.usfId]"/>
+            <db:inout-param name="p_pidm_inout" type="NUMERIC" value="#[null]"/>
+
+
+        </db:stored-procedure>
+
+        <set-variable variableName="pidm" value="#[payload.p_pidm_inout]" mimeType="application/java" doc:name="save pidm"/>
+        <set-variable variableName="usfId" value="#[payload.p_id_inout]" doc:name="save usfId"/>
+
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER" doc:name="create spbpers record">
+            <db:parameterized-query><![CDATA[call baninst1.gb_bio.p_create(
+	:p_pidm,
+	:p_ssn,
+	:p_birth_date,
+	:p_lgcy_code,
+	:p_ethn_code,
+	:p_mrtl_code,
+	:p_relg_code,
+	:p_sex,
+	:p_confid_ind,
+	:p_dead_ind,
+	:p_vetc_file_number,
+	:p_legal_name,
+	:p_pref_first_name,
+	:p_name_prefix,
+	:p_name_suffix,
+	:p_vera_ind,
+	:p_citz_ind,
+	:p_dead_date,
+	:p_citz_code,
+	:p_hair_code,
+	:p_eyes_code,
+	:p_city_birth,
+	:p_stat_code_birth,
+	:p_driver_license,
+	:p_stat_code_driver,
+	:p_natn_code_driver,
+	:p_uoms_code_height,
+	:p_height,
+	:p_uoms_code_weight,
+	:p_weight,
+	:p_sdvet_ind,
+	:p_license_issued_date,
+	:p_license_expires_date,
+	:p_incar_ind,
+	:p_itin,
+	:p_active_duty_sepr_date,
+	:p_data_origin,
+	:p_user_id,
+	:p_ethn_cde,
+	:p_confirmed_re_cde,
+	:p_confirmed_re_date,
+	:p_armed_serv_med_vet_ind,
+	:p_rowid_out
+)]]></db:parameterized-query>
+            <db:in-param name="p_pidm" type="BIGINT" value="#[flowVars.pidm]"/>
+            <db:in-param name="p_ssn" type="VARCHAR" value="#[flowVars.record.person.ssn]"/>
+            <db:in-param name="p_birth_date" type="DATE" value="#[flowVars.record.person.birthDate]"/>
+            <db:in-param name="p_lgcy_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_ethn_code" type="VARCHAR" value="#[flowVars.record.person.ethnicityCode]"/>
+            <db:in-param name="p_mrtl_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_relg_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_sex" type="VARCHAR" value="#[flowVars.record.person.gender]"/>
+            <db:in-param name="p_confid_ind" type="VARCHAR" value="#[flowVars.record.isConfidential]"/>
+            <db:in-param name="p_dead_ind" type="VARCHAR" value="#[flowVars.record.person.isDead]"/>
+            <db:in-param name="p_vetc_file_number" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_legal_name" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_pref_first_name" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_name_prefix" type="VARCHAR" value="#[flowVars.record.person.honorificPrefix]"/>
+            <db:in-param name="p_name_suffix" type="VARCHAR" value="#[flowVars.record.person.honorificSuffix]"/>
+            <db:in-param name="p_vera_ind" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_citz_ind" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_dead_date" type="DATE" value="#[flowVars.record.person.deathDate]"/>
+            <db:in-param name="p_citz_code" type="VARCHAR" value="#[flowVars.record.person.citizenCode]"/>
+            <db:in-param name="p_hair_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_eyes_code" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_city_birth" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_stat_code_birth" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_driver_license" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_stat_code_driver" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_natn_code_driver" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_uoms_code_height" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_height" type="FLOAT" value="#[null]"/>
+            <db:in-param name="p_uoms_code_weight" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_weight" type="FLOAT" value="#[null]"/>
+            <db:in-param name="p_sdvet_ind" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_license_issued_date" type="DATE" value="#[null]"/>
+            <db:in-param name="p_license_expires_date" type="DATE" value="#[null]"/>
+            <db:in-param name="p_incar_ind" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_itin" type="BIGINT" value="#[null]"/>
+            <db:in-param name="p_active_duty_sepr_date" type="DATE" value="#[null]"/>
+            <db:in-param name="p_data_origin" type="VARCHAR" value="#[flowVars.record.dataSource + '_via_sys-students']"/>
+            <db:in-param name="p_user_id" type="VARCHAR" value="#['mulesoft']"/>
+            <db:in-param name="p_ethn_cde" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_confirmed_re_cde" type="VARCHAR" value="#[null]"/>
+            <db:in-param name="p_confirmed_re_date" type="DATE" value="#[null]"/>
+            <db:in-param name="p_armed_serv_med_vet_ind" type="VARCHAR" value="#['N']"/>
+            <db:in-param name="p_rowid_out" type="VARCHAR" value="#[null]"/>
+
+
+        </db:stored-procedure>
+        <dw:transform-message doc:name="return the pidm">
+            <dw:set-payload resource="classpath:dwScripts/person/createPostPersonResponse.dwl"/>
+
+        </dw:transform-message>
+    </flow>
+</mule>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="postDecisionsFlowByUsfIdJava">
+      <set-variable variableName="flowName" value="postDecisionsFlowByUsfIdJava" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Set the key flowVars for flow">
+            <add-message-property key="term" value="#[payload.term]"/>
+            <add-message-property key="decisionCode" value="#[payload.decisionCode]"/>
+            <add-message-property key="applicationNumber" value="#[payload.applicationNumber]"/>
+            <add-message-property key="usfId" value="#[message.inboundProperties.'http.uri.params'.studentId]"/>
+        </message-properties-transformer>
+        <flow-ref name="getPersonsFlow" doc:name="getPersonsFlow"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':'Invalid USF ID.']]" doc:name="Set Payload"/>
+                <flow-ref name="ConvertToJavaAndDecisionPayloadFlow" doc:name="ConvertToJavaAndDecisionPayloadFlow"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="pidm" value="#[payload[0].pidm]" doc:name="Set PIDM"/>
+                <flow-ref name="postDecisionsTransactionFlow" doc:name="postDecisionsTransactionFlow"/>
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Decisions Status JAVA">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"usfId":flowVars.usfId,
+	"pidm":flowVars.pidm,
+	"status":"False" when flowVars.decisionPayload.P_MSG_TYPE_OUT == "F" otherwise "True",
+	"messages": [] when flowVars.decisionPayload.P_MSG_OUT == null otherwise [flowVars.decisionPayload.P_MSG_OUT]
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;postDecisionsFlowByUsfIdJava&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+    <flow name="postDecisionsJSONOutputFlow">
+        <flow-ref name="postDecisionsFlowByUsfIdJava" doc:name="postDecisionsFlowByUsfIdJava"/>
+        <dw:transform-message doc:name="Convert to JSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+
+	"responseCode": 0,
+	"responseMessage": "Data retrieved successfully",
+	"data": [payload],
+
+	"errors":[]
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="postDecisionsTransactionFlow">
+        <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+            <flow-ref name="proccessDecisionsDBFlow" doc:name="proccessDecisionsDBFlow"/>
+            <flow-ref name="ConvertToJavaAndDecisionPayloadFlow" doc:name="ConvertToJavaAndDecisionPayloadFlow"/>
+            <choice doc:name="Check if Indicator is F. All other indicators are ok to continue processing.">
+                <when expression="#[decisionPayload.P_MSG_TYPE_OUT == &quot;F&quot; || decisionPayload.P_MSG_TYPE_OUT == &quot;W&quot;]">
+                    <db:execute-ddl config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="Rollback">
+                        <db:dynamic-query><![CDATA[ROLLBACK]]></db:dynamic-query>
+                    </db:execute-ddl>
+                </when>
+                <otherwise>
+                    <logger level="INFO" doc:name="Do Nothing"/>
+                </otherwise>
+            </choice>
+        </transactional>
+    </flow>
+    <flow name="ConvertToJavaAndDecisionPayloadFlow">
+        <dw:transform-message doc:name="Convert to Java and save in decisonPayload Variable">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+            <dw:set-variable variableName="decisionPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+    </flow>
+    <flow name="proccessDecisionsDBFlow">
+        <db:stored-procedure config-ref="Oracle_Configuration_BANNER_NO_POOLING" doc:name="processDecision">
+            <db:parameterized-query><![CDATA[call BANINST1.SAKDCSN.P_PROCESS_DECSN(
+    :P_PIDM,
+    :P_TERM_CODE,
+    :P_APPL_NO,
+    :P_APDC_CODE,
+    :P_SELF_SERVICE,
+    :P_FATAL_ALLOWED,
+    :P_COMMPLAN_IND,
+    :P_MSG_TYPE_OUT,
+    :P_MSG_OUT,
+    :P_BATCH_MSG_OUT,
+    :P_MAINT_IND,
+    :P_APDC_DATE,
+    :P_SCPC_CODE
+  )]]></db:parameterized-query>
+            <db:in-param name="P_PIDM" type="NUMERIC" value="#[flowVars.pidm]"/>
+            <db:in-param name="P_TERM_CODE" type="VARCHAR" value="#[flowVars.term]"/>
+            <db:in-param name="P_APPL_NO" type="NUMERIC" value="#[flowVars.applicationNumber]"/>
+            <db:in-param name="P_APDC_CODE" type="VARCHAR" value="#[flowVars.decisionCode]"/>
+            <db:in-param name="P_SELF_SERVICE" type="VARCHAR" value="N"/>
+            <db:in-param name="P_FATAL_ALLOWED" type="VARCHAR" value="Y"/>
+            <db:in-param name="P_COMMPLAN_IND" type="VARCHAR" value="N"/>
+            <db:in-param name="P_MAINT_IND" type="VARCHAR" value="S"/>
+            <db:in-param name="P_APDC_DATE" type="DATE" value="#[server.dateTime.format('yyyy-MM-dd')]"/>
+            <db:in-param name="P_SCPC_CODE" type="VARCHAR" value="null"/>
+            <db:out-param name="P_MSG_TYPE_OUT" type="CHAR"/>
+            <db:out-param name="P_MSG_OUT" type="VARCHAR"/>
+            <db:inout-param name="P_BATCH_MSG_OUT" type="LONGVARCHAR" value="#[flowVars.batchMsgOut]"/>
+        </db:stored-procedure>
+            <choice-exception-strategy doc:name="Choice Exception Strategy">
+                <catch-exception-strategy when="#[exception.causedBy(java.sql.SQLException)]" doc:name="Catch Exception Strategy">
+                    <logger message="#[&quot;Exception Testing:&quot; + exception.cause]" level="INFO" doc:name="Logger"/>
+                <choice doc:name="Choice">
+                    <when expression="#[exception.message.contains(&quot;Required parent record not found&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Required parent record not found" doc:name="dbErrMessage Parent Record Not Found"/>
+                    </when>
+                    <when expression="#[exception.message.contains(&quot;Invalid value for application decision code&quot;)]">
+                        <set-variable variableName="dbErrMessage" value="Invalid Decision Code" doc:name="dbErrMessage Invalid Decision Code"/>
+                    </when>
+                    <otherwise>
+                        <set-variable variableName="dbErrMessage" value="Banner Database Error" doc:name="dbErrMessage Catch All"/>
+                    </otherwise>
+                </choice>
+                <set-payload value="#[['P_MSG_TYPE_OUT':'F', 'P_BATCH_MSG_OUT':null, 'P_MSG_OUT':flowVars.dbErrMessage]]" mimeType="application/java" doc:name="Set Payload"/>
+                <flow-ref name="ConvertToJavaAndDecisionPayloadFlow" doc:name="ConvertToJavaAndDecisionPayloadFlow"/>
+                </catch-exception-strategy>
+            </choice-exception-strategy>
+    </flow>
+</mule>

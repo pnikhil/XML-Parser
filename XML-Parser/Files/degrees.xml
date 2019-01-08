@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="getDegreesPidmFlow">
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="Set PIDM"/>
+        <flow-ref name="getDegreesFlow" doc:name="getDegreesFlow"/>
+    </flow>
+    <flow name="getDegreesFlow">
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Degrees">
+            <db:parameterized-query><![CDATA[select SHRDGMR_PIDM ,
+SHRDGMR_DEGC_CODE ,
+stvdegc_desc,
+SHRDGMR_DEGS_CODE ,
+stvdegs_desc,
+SHRDGMR_LEVL_CODE ,
+SHRDGMR_COLL_CODE_1 ,
+SHRDGMR_MAJR_CODE_1 ,
+SHRDGMR_MAJR_CODE_MINR_1 ,
+SHRDGMR_MAJR_CODE_CONC_1 ,
+SHRDGMR_COLL_CODE_2 ,
+SHRDGMR_MAJR_CODE_2 ,
+SHRDGMR_MAJR_CODE_MINR_2 ,
+SHRDGMR_MAJR_CODE_CONC_2 ,
+SHRDGMR_APPL_DATE ,
+SHRDGMR_GRAD_DATE ,
+SHRDGMR_MAJR_CODE_MINR_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_3 ,
+SHRDGMR_MAJR_CODE_MINR_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_3 ,
+SHRDGMR_TERM_CODE_STUREC ,
+SHRDGMR_MAJR_CODE_1_2 ,
+SHRDGMR_MAJR_CODE_2_2 ,
+SHRDGMR_CAMP_CODE ,
+SHRDGMR_TERM_CODE_GRAD ,
+SHRDGMR_ACYR_CODE ,
+SHRDGMR_GRST_CODE ,
+SHRDGMR_FEE_IND ,
+SHRDGMR_FEE_DATE ,
+SHRDGMR_AUTHORIZED ,
+SHRDGMR_TERM_CODE_COMPLETED ,
+SHRDGMR_DEGC_CODE_DUAL ,
+SHRDGMR_LEVL_CODE_DUAL ,
+SHRDGMR_DEPT_CODE_DUAL ,
+SHRDGMR_COLL_CODE_DUAL ,
+SHRDGMR_MAJR_CODE_DUAL ,
+SHRDGMR_DEPT_CODE ,
+SHRDGMR_DEPT_CODE_2 ,
+SHRDGMR_PROGRAM ,
+SHRDGMR_TERM_CODE_CTLG_1 ,
+SHRDGMR_DEPT_CODE_1_2 ,
+SHRDGMR_DEPT_CODE_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_121 ,
+SHRDGMR_MAJR_CODE_CONC_122 ,
+SHRDGMR_MAJR_CODE_CONC_123 ,
+SHRDGMR_TERM_CODE_CTLG_2 ,
+SHRDGMR_CAMP_CODE_2 ,
+SHRDGMR_MAJR_CODE_CONC_221 ,
+SHRDGMR_MAJR_CODE_CONC_222 ,
+SHRDGMR_MAJR_CODE_CONC_223 ,
+SHRDGMR_CURR_RULE_1 ,
+SHRDGMR_CMJR_RULE_1_1 ,
+SHRDGMR_CCON_RULE_11_1 ,
+SHRDGMR_CCON_RULE_11_2 ,
+SHRDGMR_CCON_RULE_11_3 ,
+SHRDGMR_CMJR_RULE_1_2 ,
+SHRDGMR_CCON_RULE_12_1 ,
+SHRDGMR_CCON_RULE_12_2 ,
+SHRDGMR_CCON_RULE_12_3 ,
+SHRDGMR_CMNR_RULE_1_1 ,
+SHRDGMR_CMNR_RULE_1_2 ,
+SHRDGMR_CURR_RULE_2 ,
+SHRDGMR_CMJR_RULE_2_1 ,
+SHRDGMR_CCON_RULE_21_1 ,
+SHRDGMR_CCON_RULE_21_2 ,
+SHRDGMR_CCON_RULE_21_3 ,
+SHRDGMR_CMJR_RULE_2_2 ,
+SHRDGMR_CCON_RULE_22_1 ,
+SHRDGMR_CCON_RULE_22_2 ,
+SHRDGMR_CCON_RULE_22_3 ,
+SHRDGMR_CMNR_RULE_2_1 ,
+SHRDGMR_CMNR_RULE_2_2
+  from shrdgmr
+  join stvdegc
+on stvdegc_code = shrdgmr_degc_code
+join stvdegs on stvdegs_code = shrdgmr_degs_code
+ where shrdgmr_pidm = #[flowVars.pidm]
+   and shrdgmr_term_code_grad = #[flowVars.currentTerm]]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="degrees" value="#[payload]" doc:name="Set degrees payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var main= flowVars.mainPayload[0]
+---
+
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"degrees" : flowVars.degrees map ((deg , indexOfdeg) -> {
+
+		"level": deg.SHRDGMR_LEVL_CODE,
+		"code" : deg.SHRDGMR_DEGC_CODE,
+		"description" : deg.STVDEGC_DESC,
+		"statusCode": deg.SHRDGMR_DEGS_CODE,
+		"statusDescription": deg.STVDEGS_DESC
+
+	})
+
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getPriorDegreesPidmFlow">
+        <set-variable variableName="pidm" value="#[payload.pidm]" doc:name="Set PIDM"/>
+        <flow-ref name="getAwardedPriorDegreesFlow" doc:name="getAwardedPriorDegreesFlow"/>
+    </flow>
+    <flow name="getAwardedPriorDegreesFlow">
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Prior Degrees">
+            <db:parameterized-query><![CDATA[select SHRDGMR_PIDM ,
+SHRDGMR_DEGC_CODE ,
+stvdegc_desc,
+SHRDGMR_DEGS_CODE ,
+stvdegs_desc,
+SHRDGMR_LEVL_CODE ,
+SHRDGMR_COLL_CODE_1 ,
+SHRDGMR_MAJR_CODE_1 ,
+SHRDGMR_MAJR_CODE_MINR_1 ,
+SHRDGMR_MAJR_CODE_CONC_1 ,
+SHRDGMR_COLL_CODE_2 ,
+SHRDGMR_MAJR_CODE_2 ,
+SHRDGMR_MAJR_CODE_MINR_2 ,
+SHRDGMR_MAJR_CODE_CONC_2 ,
+SHRDGMR_APPL_DATE ,
+SHRDGMR_GRAD_DATE ,
+SHRDGMR_MAJR_CODE_MINR_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_3 ,
+SHRDGMR_MAJR_CODE_MINR_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_3 ,
+SHRDGMR_TERM_CODE_STUREC ,
+SHRDGMR_MAJR_CODE_1_2 ,
+SHRDGMR_MAJR_CODE_2_2 ,
+SHRDGMR_CAMP_CODE ,
+SHRDGMR_TERM_CODE_GRAD ,
+SHRDGMR_ACYR_CODE ,
+SHRDGMR_GRST_CODE ,
+SHRDGMR_FEE_IND ,
+SHRDGMR_FEE_DATE ,
+SHRDGMR_AUTHORIZED ,
+SHRDGMR_TERM_CODE_COMPLETED ,
+SHRDGMR_DEGC_CODE_DUAL ,
+SHRDGMR_LEVL_CODE_DUAL ,
+SHRDGMR_DEPT_CODE_DUAL ,
+SHRDGMR_COLL_CODE_DUAL ,
+SHRDGMR_MAJR_CODE_DUAL ,
+SHRDGMR_DEPT_CODE ,
+SHRDGMR_DEPT_CODE_2 ,
+SHRDGMR_PROGRAM ,
+SHRDGMR_TERM_CODE_CTLG_1 ,
+SHRDGMR_DEPT_CODE_1_2 ,
+SHRDGMR_DEPT_CODE_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_121 ,
+SHRDGMR_MAJR_CODE_CONC_122 ,
+SHRDGMR_MAJR_CODE_CONC_123 ,
+SHRDGMR_TERM_CODE_CTLG_2 ,
+SHRDGMR_CAMP_CODE_2 ,
+SHRDGMR_MAJR_CODE_CONC_221 ,
+SHRDGMR_MAJR_CODE_CONC_222 ,
+SHRDGMR_MAJR_CODE_CONC_223 ,
+SHRDGMR_CURR_RULE_1 ,
+SHRDGMR_CMJR_RULE_1_1 ,
+SHRDGMR_CCON_RULE_11_1 ,
+SHRDGMR_CCON_RULE_11_2 ,
+SHRDGMR_CCON_RULE_11_3 ,
+SHRDGMR_CMJR_RULE_1_2 ,
+SHRDGMR_CCON_RULE_12_1 ,
+SHRDGMR_CCON_RULE_12_2 ,
+SHRDGMR_CCON_RULE_12_3 ,
+SHRDGMR_CMNR_RULE_1_1 ,
+SHRDGMR_CMNR_RULE_1_2 ,
+SHRDGMR_CURR_RULE_2 ,
+SHRDGMR_CMJR_RULE_2_1 ,
+SHRDGMR_CCON_RULE_21_1 ,
+SHRDGMR_CCON_RULE_21_2 ,
+SHRDGMR_CCON_RULE_21_3 ,
+SHRDGMR_CMJR_RULE_2_2 ,
+SHRDGMR_CCON_RULE_22_1 ,
+SHRDGMR_CCON_RULE_22_2 ,
+SHRDGMR_CCON_RULE_22_3 ,
+SHRDGMR_CMNR_RULE_2_1 ,
+SHRDGMR_CMNR_RULE_2_2
+  from shrdgmr
+  join stvdegc
+on stvdegc_code = shrdgmr_degc_code
+join stvdegs on stvdegs_code = shrdgmr_degs_code
+ where shrdgmr_pidm = #[flowVars.pidm]
+   and shrdgmr_term_code_grad < #[flowVars.currentTerm]
+   and shrdgmr_degs_code = 'AW']]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="degrees" value="#[payload]" doc:name="Set degrees payload"/>
+        <dw:transform-message doc:name="ransform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var main= flowVars.mainPayload[0]
+---
+
+{
+"firstName"	: main.firstName,
+"lastName" : main.lastName,
+"degrees" : flowVars.degrees map ((deg , indexOfdeg) -> {
+
+		"term": deg.SHRDGMR_TERM_CODE_GRAD,
+		"level": deg.SHRDGMR_LEVL_CODE,
+		"code" : deg.SHRDGMR_DEGC_CODE,
+		"description" : deg.STVDEGC_DESC,
+		"statusCode": deg.SHRDGMR_DEGS_CODE,
+		"statusDescription": deg.STVDEGS_DESC
+
+	})
+
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getDegreePlansFlow">
+        <message-properties-transformer scope="invocation" mimeType="application/java" doc:name="Set plan variables">
+            <add-message-property key="usfId" value="#[payload.usfId]"/>
+            <add-message-property key="degreePlan" value="#[payload.degreePlan]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_DegreeWorks" doc:name="Database">
+            <db:parameterized-query><![CDATA[SELECT TRIM(DAP_STU_ID) DAPSTUID ,
+TRIM(DAP_SCHOOL) DAPSCHOOL,
+TRIM(DAP_DEGREE) DAPDEGREE,
+DAP_CATALOG_YR ,
+DAP_PLAN_ID ,
+DAP_ACTIVE_FLAG ,
+TRIM(DAP_DESCRIPTION) DAPDESCRIPTION ,
+DAP_PLAN_NUM ,
+DAP_STU_APPROVAL ,
+DAP_STUAPPR_DATE ,
+DAP_ADV_APPROVAL ,
+DAP_ADVAPPR_DATE ,
+DAP_APPR_STATUS ,
+TRIM(DAP_LOCKED) DAPLOCKED ,
+DAP_MOD_ID ,
+DAP_MOD_DATE ,
+UNIQUE_ID ,
+UNIQUE_KEY 
+FROM DAP_PLANNER_DTL
+WHERE TRIM(DAP_DESCRIPTION) = #[flowVars.degreePlan] AND DAP_LOCKED = 'Y'
+AND DAP_ACTIVE_FLAG = 'Y'
+and TRIM(dap_stu_id) = #[flowVars.usfId]]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="degreePlan" value="#[payload]" doc:name="Set degree plan payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+---
+{
+	"usfId": flowVars.degreePlan.DAPSTUID,
+	"degreePlanLocked": flowVars.degreePlan.DAPLOCKED,
+	"degreeCode": flowVars.degreePlan.DAPDEGREE,
+	"planDescription": flowVars.degreePlan.DAPDESCRIPTION,
+	"school": flowVars.degreePlan.DAPSCHOOL
+
+	}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getAllDegreePlansBatchFlow">
+        <set-variable variableName="degreePlan" value="FIF2014" doc:name="Set Degree Plan Code"/>
+        <db:select config-ref="Oracle_Configuration_DegreeWorks" doc:name="Get FIF degree plans for all students">
+            <db:parameterized-query><![CDATA[SELECT
+    dapstuid,
+    dapschool,
+    dapdegree,
+    dap_catalog_yr,
+    dap_plan_id,
+    dapactiveflag,
+    dapdescription,
+    dap_plan_num,
+    dap_stu_approval,
+    dap_stuappr_date,
+    dap_adv_approval,
+    dap_advappr_date,
+    dap_appr_status,
+    daplocked,
+    grad_term,
+    ( substr(
+        grad_term,
+        1,
+        4
+    ) - substr(
+        dapdescription,
+        4,
+        4
+    ) ) potentialyrstograd,
+    dap_mod_id,
+    dapmoddate,
+    unique_id,
+    unique_key
+FROM
+    (
+        SELECT
+            dappop.*,
+            RANK() OVER(PARTITION BY
+                dapstuid
+                ORDER BY
+                    daplocked
+                DESC NULLS LAST,
+                    dapactiveflag
+                DESC NULLS LAST,
+                    dapmoddate
+                DESC,
+                    grad_term
+                DESC
+            ) AS rank
+        FROM
+            (
+                WITH planchanges AS (
+                    SELECT DISTINCT
+                        dap_stu_id
+                    FROM
+                        dap_planner_dtl
+                    WHERE
+                            REGEXP_LIKE ( TRIM(dap_planner_dtl.dap_description),'^FIF\d{4}$' )
+                        AND
+                            dap_planner_dtl.dap_mod_date >= to_timestamp(
+                                #[timeStamp],
+                                'yyyy-MM-dd HH24:mi:ss',
+                                'NLS_DATE_LANGUAGE = American'
+                            )
+                ) SELECT
+                    TRIM(dap_planner_dtl.dap_stu_id) dapstuid,
+                    TRIM(dap_planner_dtl.dap_school) dapschool,
+                    TRIM(dap_planner_dtl.dap_degree) dapdegree,
+                    dap_planner_dtl.dap_catalog_yr,
+                    dap_planner_dtl.dap_plan_id,
+                    TRIM(dap_planner_dtl.dap_active_flag) dapactiveflag,
+                    TRIM(dap_planner_dtl.dap_description) dapdescription,
+                    dap_planner_dtl.dap_plan_num,
+                    dap_planner_dtl.dap_stu_approval,
+                    dap_planner_dtl.dap_stuappr_date,
+                    dap_planner_dtl.dap_adv_approval,
+                    dap_planner_dtl.dap_advappr_date,
+                    dap_planner_dtl.dap_appr_status,
+                    TRIM(dap_planner_dtl.dap_locked) daplocked,
+                    (
+                        SELECT
+                            trim(MAX(dap_plancrs_dtl.dap_term) )
+                        FROM
+                            dap_plancrs_dtl
+                        WHERE
+                                dap_plancrs_dtl.dap_stu_id = dap_planner_dtl.dap_stu_id
+                            AND
+                                dap_plancrs_dtl.dap_school = dap_planner_dtl.dap_school
+                            AND
+                                dap_plancrs_dtl.dap_degree = dap_planner_dtl.dap_degree
+                            AND
+                                dap_plancrs_dtl.dap_plan_num = dap_planner_dtl.dap_plan_num
+                            AND
+                                REGEXP_LIKE ( TRIM(dap_plancrs_dtl.dap_term),'^\d{6}$' )
+                    ) grad_term,
+                    dap_planner_dtl.dap_mod_id,
+                    TO_CHAR(
+                        dap_planner_dtl.dap_mod_date,
+                        'yyyy-MM-dd HH24:mi:ss',
+                        'NLS_DATE_LANGUAGE = American'
+                    ) dapmoddate,
+                    dap_planner_dtl.unique_id,
+                    dap_planner_dtl.unique_key
+                FROM
+                    dap_planner_dtl
+                    JOIN planchanges ON planchanges.dap_stu_id = dap_planner_dtl.dap_stu_id
+                WHERE
+                    REGEXP_LIKE ( TRIM(dap_planner_dtl.dap_description),'^FIF\d{4}$' )
+            ) dappop
+    ) applydapchanges
+WHERE
+    rank = 1]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform message to Java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="getDegreesByStudentOutcomeRecordTermFlow">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="pidm" value="#[payload.pidm]"/>
+            <add-message-property key="curriculumTerm" value="#[payload.curriculumTerm]"/>
+            <add-message-property key="degree" value="#[payload.degree]"/>
+        </message-properties-transformer>
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get degree record based on the student record term">
+            <db:parameterized-query><![CDATA[select SHRDGMR_PIDM ,
+SHRDGMR_DEGC_CODE ,
+stvdegc_desc,
+SHRDGMR_DEGS_CODE ,
+stvdegs_desc,
+SHRDGMR_LEVL_CODE ,
+SHRDGMR_COLL_CODE_1 ,
+SHRDGMR_MAJR_CODE_1 ,
+SHRDGMR_MAJR_CODE_MINR_1 ,
+SHRDGMR_MAJR_CODE_CONC_1 ,
+SHRDGMR_COLL_CODE_2 ,
+SHRDGMR_MAJR_CODE_2 ,
+SHRDGMR_MAJR_CODE_MINR_2 ,
+SHRDGMR_MAJR_CODE_CONC_2 ,
+SHRDGMR_APPL_DATE ,
+SHRDGMR_GRAD_DATE ,
+SHRDGMR_MAJR_CODE_MINR_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_2 ,
+SHRDGMR_MAJR_CODE_CONC_1_3 ,
+SHRDGMR_MAJR_CODE_MINR_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_2_3 ,
+SHRDGMR_TERM_CODE_STUREC ,
+SHRDGMR_MAJR_CODE_1_2 ,
+SHRDGMR_MAJR_CODE_2_2 ,
+SHRDGMR_CAMP_CODE ,
+SHRDGMR_TERM_CODE_GRAD ,
+SHRDGMR_ACYR_CODE ,
+SHRDGMR_GRST_CODE ,
+SHRDGMR_FEE_IND ,
+SHRDGMR_FEE_DATE ,
+SHRDGMR_AUTHORIZED ,
+SHRDGMR_TERM_CODE_COMPLETED ,
+SHRDGMR_DEGC_CODE_DUAL ,
+SHRDGMR_LEVL_CODE_DUAL ,
+SHRDGMR_DEPT_CODE_DUAL ,
+SHRDGMR_COLL_CODE_DUAL ,
+SHRDGMR_MAJR_CODE_DUAL ,
+SHRDGMR_DEPT_CODE ,
+SHRDGMR_DEPT_CODE_2 ,
+SHRDGMR_PROGRAM ,
+SHRDGMR_TERM_CODE_CTLG_1 ,
+SHRDGMR_DEPT_CODE_1_2 ,
+SHRDGMR_DEPT_CODE_2_2 ,
+SHRDGMR_MAJR_CODE_CONC_121 ,
+SHRDGMR_MAJR_CODE_CONC_122 ,
+SHRDGMR_MAJR_CODE_CONC_123 ,
+SHRDGMR_TERM_CODE_CTLG_2 ,
+SHRDGMR_CAMP_CODE_2 ,
+SHRDGMR_MAJR_CODE_CONC_221 ,
+SHRDGMR_MAJR_CODE_CONC_222 ,
+SHRDGMR_MAJR_CODE_CONC_223 ,
+SHRDGMR_CURR_RULE_1 ,
+SHRDGMR_CMJR_RULE_1_1 ,
+SHRDGMR_CCON_RULE_11_1 ,
+SHRDGMR_CCON_RULE_11_2 ,
+SHRDGMR_CCON_RULE_11_3 ,
+SHRDGMR_CMJR_RULE_1_2 ,
+SHRDGMR_CCON_RULE_12_1 ,
+SHRDGMR_CCON_RULE_12_2 ,
+SHRDGMR_CCON_RULE_12_3 ,
+SHRDGMR_CMNR_RULE_1_1 ,
+SHRDGMR_CMNR_RULE_1_2 ,
+SHRDGMR_CURR_RULE_2 ,
+SHRDGMR_CMJR_RULE_2_1 ,
+SHRDGMR_CCON_RULE_21_1 ,
+SHRDGMR_CCON_RULE_21_2 ,
+SHRDGMR_CCON_RULE_21_3 ,
+SHRDGMR_CMJR_RULE_2_2 ,
+SHRDGMR_CCON_RULE_22_1 ,
+SHRDGMR_CCON_RULE_22_2 ,
+SHRDGMR_CCON_RULE_22_3 ,
+SHRDGMR_CMNR_RULE_2_1 ,
+SHRDGMR_CMNR_RULE_2_2
+  from shrdgmr
+  join stvdegc
+on stvdegc_code = shrdgmr_degc_code
+join stvdegs on stvdegs_code = shrdgmr_degs_code
+ where shrdgmr_pidm = #[flowVars.pidm]
+   and SHRDGMR_DEGC_CODE = #[flowVars.degree]
+   and (SHRDGMR_TERM_CODE_STUREC = #[flowVars.curriculumTerm]
+        or SHRDGMR_TERM_CODE_GRAD = #[flowVars.curriculumTerm])]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+
+{
+"degrees" : payload map ((deg , indexOfdeg) -> {
+
+		studentRecTerm: deg.SHRDGMR_TERM_CODE_STUREC,
+		level: deg.SHRDGMR_LEVL_CODE,
+		degreeCode: deg.SHRDGMR_DEGC_CODE,
+		degree: deg.STVDEGC_DESC,
+		statusCode: deg.SHRDGMR_DEGS_CODE,
+		status: deg.STVDEGS_DESC,
+		applicationDate: deg.SHRDGMR_APPL_DATE,
+		graduationTerm: deg.SHRDGMR_TERM_CODE_GRAD,
+		graduationDate: deg.SHRDGMR_DRAD_DATE
+
+	})
+
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+</mule>

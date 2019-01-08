@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <flow name="getCurrentTermFlow">
+        <http:listener config-ref="api-httpListenerConfig" path="/terms" doc:name="HTTP"/>
+
+        <set-variable variableName="flowName" value="getCurrentTermFlow" doc:name="Set flow variable for flowName" />
+        <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+            level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get current term">
+            <db:parameterized-query><![CDATA[Select baninst1.wf_current_term_db currTerm from dual]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="currentTerm" value="#[payload[0].CURRTERM]" doc:name="currentTerm Variable"/>
+        <flow-ref name="getFutureTermFlow" doc:name="getFutureTermFlow"/>
+        <flow-ref name="getPrevTermFlow" doc:name="getPrevTermFlow"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getCurrentTermFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getFutureTermFlow">
+      <set-variable variableName="flowName" value="getFutureTermFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Future Term">
+            <db:parameterized-query><![CDATA[select baninst1.wf_calc_next_prev_term_db(#[flowVars.currentTerm],'+','1') ftrTerm FROM DUAL]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="futureTerm" value="#[payload[0].FTRTERM]" doc:name="futureTermVariable"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getFutureTermFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+
+    <flow name="getPrevTermFlow">
+      <set-variable variableName="flowName" value="getPrevTermFlow" doc:name="Set flow variable for flowName" />
+      <logger message="projectName=#[flowVars.projectName],flowName=#[flowVars.flowName],logProcessId=#[flowVars.logUUID],message=&quot;START&quot;"
+          level="INFO" doc:name="Log generic flow details" category="edu.usf.esb.${app.application.name}" />
+
+        <db:select config-ref="Oracle_Configuration_BANNER" doc:name="Get Previous Term">
+            <db:parameterized-query><![CDATA[select baninst1.wf_calc_next_prev_term_db(#[flowVars.currentTerm],'-','1') prevTerm FROM DUAL]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="prevTerm" value="#[payload[0].PREVTERM]" doc:name="previousTermVariable"/>
+        <logger message="projectName=#[flowVars.projectName],flowName=&quot;getPrevTermFlow&quot;,logProcessId=#[flowVars.logUUID],message=&quot;FINISH&quot;"
+            level="DEBUG" doc:name="Log timing" category="edu.usf.esb.${app.application.name}" />
+    </flow>
+</mule>
